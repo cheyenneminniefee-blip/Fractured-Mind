@@ -1,0 +1,21 @@
+kind = "web"
+previewPath = "/"
+title = "Fractured Mind"
+version = "1.0.0"
+id = "artifacts/fractured-mind"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 3000
+
+[services.development]
+run = "node /home/runner/workspace/server.js"
+
+[services.env]
+PORT = "3000"
