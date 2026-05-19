@@ -1,1 +1,14 @@
-[]
+[
+  {
+    "id": "cac6a0fd-0a11-42bf-8fef-57f503dc3082",
+    "userId": "92ba2411-c7df-4a63-b2ef-2a0b2cb23cf3",
+    "username": "clm",
+    "email": "clm@gmail.com",
+    "avatarUrl": "",
+    "bio": "bazinga",
+    "auraColor": "#8a2be2",
+    "mindState": "Melancholic",
+    "combatStyle": "Agile Bladesman",
+    "coreMemory": "bazinga"
+  }
+]

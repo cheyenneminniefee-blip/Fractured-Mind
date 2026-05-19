@@ -1,0 +1,120 @@
+<div id="game-container">
+    <div id="player-hud">
+        <h2>System Synchronization: <%= profile.username %></h2>
+        <p>Aura Color Profile: <span style="color: <%= profile.auraColor %>; font-weight: bold;"><%= profile.auraColor %></span></p>
+        <p>Combat Routine: <strong><%= profile.combatStyle %></strong></p>
+    </div>
+
+    <canvas id="gameCanvas" width="800" height="450"></canvas>
+</div>
+<style>
+    body {
+        margin: 0;
+        background-color: #0d0d11;
+        color: #ffffff;
+        font-family: 'Courier New', Courier, monospace;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+    }
+    #game-container {
+        text-align: center;
+    }
+    #player-hud {
+        background-color: #16161f;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 15px;
+        border: 1px solid #333344;
+    }
+    #gameCanvas {
+        background-color: #000000;
+        border: 3px solid #444455;
+        box-shadow: 0 0 25px rgba(255, 255, 255, 0.1);
+    }
+</style>
+<script>
+    // 1. Core Engine Setup
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // 2. Instantiate Player Object using relational EJS database values
+    const player = {
+        x: canvas.width / 2 - 15, // Center horizontally
+        y: canvas.height / 2 - 15, // Center vertically
+        width: 30,
+        height: 30,
+        color: "<%= profile.auraColor %>" || "#ffffff", 
+        speed: 4,
+        velocityX: 0,
+        velocityY: 0,
+        friction: 0.85
+    };
+
+    // 3. Track Keyboard Input State
+    const keys = {
+        w: false,
+        a: false,
+        s: false,
+        d: false
+    };
+
+    // Event Listeners for System Inputs
+    window.addEventListener('keydown', (e) => {
+        if (e.key.toLowerCase() in keys) keys[e.key.toLowerCase()] = true;
+    });
+
+    window.addEventListener('keyup', (e) => {
+        if (e.key.toLowerCase() in keys) keys[e.key.toLowerCase()] = false;
+    });
+
+    // 4. Mathematical Engine Physics & Boundary Logic
+    function updatePhysics() {
+        // Apply acceleration forces based on inputs
+        if (keys.w) player.velocityY -= player.speed * 0.15;
+        if (keys.s) player.velocityY += player.speed * 0.15;
+        if (keys.a) player.velocityX -= player.speed * 0.15;
+        if (keys.d) player.velocityX += player.speed * 0.15;
+
+        // Apply friction to simulate resistance
+        player.velocityX *= player.friction;
+        player.velocityY *= player.friction;
+
+        // Move the player coordinates
+        player.x += player.velocityX;
+        player.y += player.velocityY;
+
+        // Canvas Boundary Collision Guards
+        if (player.x < 0) player.x = 0;
+        if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+        if (player.y < 0) player.y = 0;
+        if (player.y + player.height > canvas.height) player.y = canvas.height - player.height;
+    }
+
+    // 5. Canvas Painter Function
+    function renderGraphics() {
+        // Clear the canvas whiteboard from the previous frame
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw Player Signature Signature Square
+        ctx.fillStyle = player.color;
+        ctx.fillRect(player.x, player.y, player.width, player.height);
+
+        // Add a clean cyberpunk glow effect based on player color
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = player.color;
+    }
+
+    // 6. Master Loop Executor
+    function gameLoop() {
+        updatePhysics();   // Run mathematical calculations
+        renderGraphics();  // Paint updated coordinates to screen
+
+        // Instruct browser to sync loop execution natively at ~60 FPS
+        requestAnimationFrame(gameLoop);
+    }
+
+    // Initialize the engine loop!
+    gameLoop();
+</script>

@@ -43,10 +43,6 @@ app.get('/register', (req, res) => {
 app.get('/dev-log', (req, res) => {
     res.render('dev-log');
 });
-// Sectional Title: Core Game, Search, and Leaderboard Route Stubs - 2026-05-18
-app.get('/game', (req, res) => {
-    res.render('game');
-});
 
 app.get('/search', (req, res) => {
     res.render('search');
@@ -87,23 +83,26 @@ app.post('/auth/register', (req, res) => {
     // 4. Append and save the updated file
     usersDb.push(newUserRecord);
     fs.writeFileSync(usersDbPath, JSON.stringify(usersDb, null, 2));
-    // Sectional Title: Profile and Game State Initialization - 2026-05-18
-    // 1. Extract narrative specifics from the form
-    const { auraColor, mindState, coreMemory } = req.body;
+    // Sectional Title: Extended Profile Registration Logic - 2026-05-18
+    // 1. Extract ALL profile and narrative specifics from the form
+    const { email, auraColor, mindState, coreMemory, avatarUrl, bio, combatStyle } = req.body;
 
-    // 2. Read existing relational databases
+    // 2. Read existing relational databases (Keep your existing code here!)
     let profilesDb = JSON.parse(fs.readFileSync(profilesDbPath, 'utf8'));
     let gamestateDb = JSON.parse(fs.readFileSync(gamestateDbPath, 'utf8'));
 
-    // 3. Construct and append the new Profile record
+    // 3. Construct and append the full Profile record
     profilesDb.push({
         id: crypto.randomUUID(),
-        userId: userId, // This links directly to the users.json record!
+        userId: userId, 
         username: username,
+        email: email,
+        avatarUrl: avatarUrl,
+        bio: bio,
         auraColor: auraColor,
         mindState: mindState,
-        coreMemory: coreMemory,
-        joinedDate: timestamp
+        combatStyle: combatStyle,
+        coreMemory: coreMemory
     });
 
     // 4. Construct and append the new Game State record with default starting values
@@ -125,24 +124,41 @@ app.post('/auth/register', (req, res) => {
 });
 
 // Sectional Title: Login Authentication Route - 2026-05-18
-app.post('/auth/login', (req, res) => {
-    // Extract the credentials typed into the login form
-    const { username, password } = req.body;
+    // Sectional Title: Corrected Login Authentication Route - 2026-05-18
+    app.post('/auth/login', (req, res) => {
+        const { username, password } = req.body;
+        let usersDb = JSON.parse(fs.readFileSync(usersDbPath, 'utf8'));
+        const validUser = usersDb.find(user => user.username === username && user.password === password);
 
-    // 1. Read the current database into memory
-    let usersDb = JSON.parse(fs.readFileSync(usersDbPath, 'utf8'));
+        if (validUser) {
+            console.log(`[Fractured Mind] Synchronization successful for: ${validUser.username}`);
+            req.session.userId = validUser.id; 
+            res.redirect('/game'); 
+        } else {
+            console.log(`[Fractured Mind] Failed synchronization attempt.`);
+            res.redirect('/'); 
+        }
+    }); 
 
-    // 2. Search the database for a matching record
-    const validUser = usersDb.find(user => user.username === username && user.password === password);
-
-    // 3. Handle the login success or failure
-    if (validUser) {
-        console.log(`[Fractured Mind] Synchronization successful for: ${validUser.username}`);
-        res.redirect('/game'); // Send them to the game canvas!
-    } else {
-        console.log(`[Fractured Mind] Failed synchronization attempt.`);
-        res.redirect('/'); // Boot them back to the login page
+// 2. Update your /game route to check for the session:
+// Sectional Title: Fetching Session Profile for Game View - 2026-05-18
+// Sectional Title: Secure Profile Fallback Handling - 2026-05-18
+app.get('/game', (req, res) => {
+    if (!req.session.userId) {
+        console.log("[Fractured Mind] Unauthorized access attempt blocked.");
+        return res.redirect('/'); 
     }
+
+    let profilesDb = JSON.parse(fs.readFileSync(profilesDbPath, 'utf8'));
+    const userProfile = profilesDb.find(profile => profile.userId === req.session.userId);
+
+    // SAFETY GATE: If the user is logged in but has no profile entry, don't crash!
+    if (!userProfile) {
+        console.log(`[Fractured Mind] Warning: No profile found for userId: ${req.session.userId}`);
+        return res.redirect('/'); // Redirect them to safety
+    }
+
+    res.render('game', { profile: userProfile });
 });
 
 app.listen(PORT, () => {
