@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fractured Mind - Create Profile</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <main class="registration-container">
+        <h2>Forge Your Consciousness</h2>
+
+        <form action="/auth/register" method="POST" class="register-form">
+            <div class="form-group">
+                <label for="username">Unique Identifier (Username)</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+            <div class="form-group">
+                <label for="email">Subsystem Email</label>
+                <input type="email" id="email" name="email" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Security Cipher (Password)</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <div class="form-group">
+                <label for="auraColor">Aura Color Hex</label>
+                <input type="color" id="auraColor" name="auraColor" value="#8A2BE2">
+            </div>
+            <div class="form-group">
+                <label for="mindState">Initial Mind State</label>
+                <select id="mindState" name="mindState">
+                    <option value="Melancholic">Melancholic</option>
+                    <option value="Fractured">Fractured</option>
+                    <option value="Resilient">Resilient</option>
+                    <option value="Anxious">Anxious</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="coreMemory">Anchoring Core Memory</label>
+                <textarea id="coreMemory" name="coreMemory" rows="3" placeholder="Describe a vivid, formative memory..." required></textarea>
+            </div>
+
+            <button type="submit" class="btn-register">Manifest Profile</button>
+            </form>
+            <p class="redirect-text">Already synchronized? <a href="/">Log in here</a>.</p>
+            </main>
+            </body>
+            </html>
