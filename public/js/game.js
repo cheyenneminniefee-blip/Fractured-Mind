@@ -1,68 +1,104 @@
-// Sectional Title: Platform Object Generation & Collision Resolution - 2026-05-18
+// Sectional Title: Tilemap Matrix Grid Engine (game.js) - 2026-05-18
 
 // 1. Core Engine Canvas Setup
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 const container = document.getElementById("game-container");
 
-// 2. Dynamic Resolution Matcher
+// Dynamic Resolution Matcher
 canvas.width = container.clientWidth - 4;
 canvas.height = container.clientHeight - 4;
 
-// 3. Fetch relational data from EJS handoff
+// 2. Fetch data from EJS handoff
 const userProfile = window.GAME_STATE.playerProfile;
 
-// 4. Consolidated Platformer Player Object
-const player = {
-    x: canvas.width / 2 - 15,
-    y: canvas.height - 100, // Spawn slightly above the floor
-    width: 30,
-    height: 30,
-    color: userProfile.auraColor || "#ffffff",
-    speed: 0.8,
-    maxSpeed: 6,
-    velocityX: 0,
-    velocityY: 0,
-    friction: 0.85,
-    gravity: 0.6,
-    jumpStrength: -23, 
-    isGrounded: false
-};
+// 3. Grid Configuration (12 Rows x 20 Columns Matrix)
+// 0 = Open Air Workspace, 1 = Solid Cybernetic Ground Structure
+// Sectional Title: Dynamic Physics Scaling Architecture - 2026-05-19
 
-// 5. Dynamic Platform Array Layout
-// We calculate X and Y positions proportionally so they scale seamlessly across different resolutions
-const platforms = [
-    { 
-        x: canvas.width * 0.15, 
-        y: canvas.height * 0.75, 
-        width: canvas.width * 0.25, 
-        height: 15, 
-        color: "#2a2a35" 
-    },
-    { 
-        x: canvas.width * 0.60, 
-        y: canvas.height * 0.60, 
-        width: canvas.width * 0.25, 
-        height: 15, 
-        color: "#2a2a35" 
-    },
-    { 
-        x: canvas.width * 0.35, 
-        y: canvas.height * 0.40, 
-        width: canvas.width * 0.30, 
-        height: 15, 
-        color: "#2a2a35" 
-    }
+// Sectional Title: Adding Win Conditions to the Grid Engine - 2026-05-19
+
+// 3. Grid Configuration (0 = Air, 1 = Wall, 2 = Goal Portal)
+const levelGrid = [
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0], // Notice the '2' placed here!
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1],
+    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
 ];
 
-// 6. Track Keyboard Input State
-const keys = {
-    w: false,
-    a: false,
-    s: false,
-    d: false,
-    ' ': false
+const gridRows = levelGrid.length;
+const gridCols = levelGrid[0].length;
+const tileWidth = canvas.width / gridCols;
+const tileHeight = canvas.height / gridRows;
+
+const scaleX = tileWidth / 40;
+const scaleY = tileHeight / 37.5;
+
+// 4. Structural Array Compilers
+const platforms = [];
+const goals = []; // New array specifically for extraction points
+
+for (let row = 0; row < gridRows; row++) {
+    for (let col = 0; col < gridCols; col++) {
+        // If it's a 1, build a solid wall
+        if (levelGrid[row][col] === 1) {
+            platforms.push({
+                x: col * tileWidth,
+                y: row * tileHeight,
+                width: tileWidth,
+                height: tileHeight,
+                color: "#1f1f2e",
+            });
+        }
+        // If it's a 2, build a Goal block
+        else if (levelGrid[row][col] === 2) {
+            goals.push({
+                x: col * tileWidth,
+                y: row * tileHeight,
+                width: tileWidth,
+                height: tileHeight,
+                color: "#00ffcc", // Bright neon cyan
+            });
+        }
+    }
+}
+
+// 5. Responsive Platformer Player Object
+const player = {
+    x: canvas.width / 2 - 12.5 * scaleX,
+    y: canvas.height - tileHeight * 2,
+
+    // Size scales directly with screen real estate
+    width: 25 * scaleX,
+    height: 25 * scaleY,
+
+    color: userProfile.auraColor || "#ffffff",
+
+    // Horizontal forces scale with horizontal tile changes
+    speed: 0.6 * scaleX,
+    maxSpeed: 4 * scaleX,
+    velocityX: 0,
+
+    // Vertical forces scale with vertical tile changes
+    velocityY: 0,
+    gravity: 0.4 * scaleY,
+    jumpStrength: -9.5 * scaleY,
+
+    // Friction is a percentage multiplier (0.85), so it remains constant across all screens!
+    friction: 0.85,
+    isGrounded: false,
 };
+
+// 6. Track Keyboard Input State
+const keys = { w: false, a: false, s: false, d: false, " ": false };
 
 window.addEventListener("keydown", (e) => {
     const key = e.key.toLowerCase();
@@ -74,59 +110,52 @@ window.addEventListener("keyup", (e) => {
     if (key in keys) keys[key] = false;
 });
 
-// 7. Mathematical Engine Physics & Advanced Collisions
+// 7. Mathematical Engine Physics & Tilemap Collisions
+// 7. Mathematical Engine Physics & Solid Block Collisions
 function updatePhysics() {
-    // Apply horizontal acceleration forces
+    // 1. Horizontal Acceleration & Friction
     if (keys.a) player.velocityX -= player.speed;
     if (keys.d) player.velocityX += player.speed;
 
-    // Apply friction drag
     player.velocityX *= player.friction;
 
-    // Clamp running velocities
     if (player.velocityX > player.maxSpeed) player.velocityX = player.maxSpeed;
-    if (player.velocityX < -player.maxSpeed) player.velocityX = -player.maxSpeed;
+    if (player.velocityX < -player.maxSpeed)
+        player.velocityX = -player.maxSpeed;
 
-    // Apply constant downward gravity acceleration
+    // 2. Vertical Gravity & Jumping
     player.velocityY += player.gravity;
 
-    // Trigger jump matrix if grounded and inputs match
-    if ((keys.w || keys[' ']) && player.isGrounded) {
+    if ((keys.w || keys[" "]) && player.isGrounded) {
         player.velocityY = player.jumpStrength;
-        player.isGrounded = false; 
+        player.isGrounded = false;
     }
 
-    // Mutate position tracking vectors
+    // --- STEP A: X-Axis Movement & Collision Resolution ---
     player.x += player.velocityX;
-    player.y += player.velocityY;
 
-    // Reset grounded flag before calculating structural obstructions
-    player.isGrounded = false;
-
-    // AABB Platform Collision Processing (Solid Surfaces)
-    platforms.forEach(platform => {
-        // Condition A: Verify horizontal axis intersection
-        const matchHorizontal = player.x + player.width > platform.x && player.x < platform.x + platform.width;
-
-        // Condition B: Verify vertical bounding line intersection
-        const matchVertical = player.y + player.height >= platform.y && player.y + player.height - player.velocityY <= platform.y + 6;
-
-        // Resolve collision if falling onto a platform from above
-        if (matchHorizontal && matchVertical && player.velocityY >= 0) {
-            player.y = platform.y - player.height; // Snap smoothly to the surface
-            player.velocityY = 0;                  // Cancel kinetic falling energy
-            player.isGrounded = true;              // Restore jumping structural privileges
+    platforms.forEach((platform) => {
+        // Standard AABB Overlap Check
+        if (
+            player.x < platform.x + platform.width &&
+            player.x + player.width > platform.x &&
+            player.y < platform.y + platform.height &&
+            player.y + player.height > platform.y
+        ) {
+            // If moving right, push player to the left edge of the block
+            if (player.velocityX > 0) {
+                player.x = platform.x - player.width;
+                player.velocityX = 0;
+            }
+            // If moving left, push player to the right edge of the block
+            else if (player.velocityX < 0) {
+                player.x = platform.x + platform.width;
+                player.velocityX = 0;
+            }
         }
     });
 
-    // Boundary Collisions: Main Canvas Floor
-    if (player.y + player.height >= canvas.height) {
-        player.y = canvas.height - player.height; 
-        player.velocityY = 0; 
-        player.isGrounded = true; 
-    }
-
-    // Boundary Collisions: Left & Right Structural Screen Bounds
+    // Outer Boundary Collisions: Left & Right Walls
     if (player.x < 0) {
         player.x = 0;
         player.velocityX = 0;
@@ -134,27 +163,84 @@ function updatePhysics() {
         player.x = canvas.width - player.width;
         player.velocityX = 0;
     }
+
+    // --- STEP B: Y-Axis Movement & Collision Resolution ---
+    player.y += player.velocityY;
+    player.isGrounded = false; // Reset before checking floors
+
+    platforms.forEach((platform) => {
+        // Standard AABB Overlap Check (Using updated Y coordinates)
+        if (
+            player.x < platform.x + platform.width &&
+            player.x + player.width > platform.x &&
+            player.y < platform.y + platform.height &&
+            player.y + player.height > platform.y
+        ) {
+            // If falling down, snap to the top of the block (Floor)
+            if (player.velocityY > 0) {
+                player.y = platform.y - player.height;
+                player.velocityY = 0;
+                player.isGrounded = true;
+            }
+            // If jumping up, snap to the bottom of the block (Ceiling)
+            else if (player.velocityY < 0) {
+                player.y = platform.y + platform.height;
+                player.velocityY = 0;
+            }
+        }
+    });
+
+    // Outer Boundary Collisions: Main Canvas Floor
+    if (player.y + player.height > canvas.height) {
+        player.y = canvas.height - player.height;
+        player.velocityY = 0;
+        player.isGrounded = true;
+    }
+    // --- STEP C: Goal Collision Detection ---
+    goals.forEach((goal) => {
+        if (
+            player.x < goal.x + goal.width &&
+            player.x + player.width > goal.x &&
+            player.y < goal.y + goal.height &&
+            player.y + player.height > goal.y
+        ) {
+            // WIN CONDITION TRIGGERED!
+            alert("SYSTEM OVERRIDE: Level Complete.");
+
+            // Reset player to the starting point to "restart" the level for now
+            player.x = canvas.width / 2 - 12.5 * scaleX;
+            player.y = canvas.height - tileHeight * 2;
+            player.velocityX = 0;
+            player.velocityY = 0;
+        }
+    });
 }
 
 // 8. Canvas Graphics Painter Pipeline
 function renderGraphics() {
-    // Wipe layout clean before paint cycle execution
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Turn off lighting effects for environment objects to preserve performance
+    // Draw compiled structural tiles from array
     ctx.shadowBlur = 0;
-
-    // Draw Static Structural Platforms
-    platforms.forEach(platform => {
+    platforms.forEach((platform) => {
         ctx.fillStyle = platform.color;
         ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
 
-        // Draw a subtle design line across the top edge of each platform
-        ctx.fillStyle = "#444455";
-        ctx.fillRect(platform.x, platform.y, platform.width, 2);
+        // Highlight grid borders to make the blocks visually distinct
+        ctx.strokeStyle = "#333344";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(platform.x, platform.y, platform.width, platform.height);
     });
 
-    // Draw Player Avatar Square with Cyberpunk Glow Matrix
+    // Draw the Goal Portals with a glowing effect
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = "#00ffcc";
+    goals.forEach((goal) => {
+        ctx.fillStyle = goal.color;
+        ctx.fillRect(goal.x, goal.y, goal.width, goal.height);
+    });
+
+    // Draw Player Avatar Square with Glowing Aura
     ctx.shadowBlur = 15;
     ctx.shadowColor = player.color;
     ctx.fillStyle = player.color;
@@ -163,10 +249,10 @@ function renderGraphics() {
 
 // 9. Master Frame Loop
 function gameLoop() {
-    updatePhysics(); 
-    renderGraphics(); 
+    updatePhysics();
+    renderGraphics();
     requestAnimationFrame(gameLoop);
 }
 
-// Execute core loop engine
+// Run engine initialization
 gameLoop();
