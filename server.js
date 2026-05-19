@@ -19,8 +19,18 @@ const PORT = process.env.PORT || 3000;
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.urlencoded({ extended: true })); // <--- Check this!
-app.use(express.json());                         // <--- Check this!
+// Sectional Title: Session Middleware Integration - 2026-05-18
+app.use(express.urlencoded({ extended: true })); 
+app.use(express.json());                         
+
+// 2.5 Initialize Session Backpacks (Must be before routes!)
+const session = require('express-session');
+app.use(session({
+    secret: 'fractured-mind-secret-key', 
+    resave: false,
+    saveUninitialized: false
+}));
+
 // Sectional Title: Root Route Handling for Home/Login Page - 2026-05-18
 app.get('/', (req, res) => {
     res.render('index');
@@ -112,6 +122,27 @@ app.post('/auth/register', (req, res) => {
     fs.writeFileSync(gamestateDbPath, JSON.stringify(gamestateDb, null, 2));
     // Redirect to login
     res.redirect('/');
+});
+
+// Sectional Title: Login Authentication Route - 2026-05-18
+app.post('/auth/login', (req, res) => {
+    // Extract the credentials typed into the login form
+    const { username, password } = req.body;
+
+    // 1. Read the current database into memory
+    let usersDb = JSON.parse(fs.readFileSync(usersDbPath, 'utf8'));
+
+    // 2. Search the database for a matching record
+    const validUser = usersDb.find(user => user.username === username && user.password === password);
+
+    // 3. Handle the login success or failure
+    if (validUser) {
+        console.log(`[Fractured Mind] Synchronization successful for: ${validUser.username}`);
+        res.redirect('/game'); // Send them to the game canvas!
+    } else {
+        console.log(`[Fractured Mind] Failed synchronization attempt.`);
+        res.redirect('/'); // Boot them back to the login page
+    }
 });
 
 app.listen(PORT, () => {
