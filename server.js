@@ -20,8 +20,7 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.use(express.static(path.join(__dirname, 'public')));
 // Sectional Title: Session Middleware Integration - 2026-05-18
-app.use(express.urlencoded({ extended: true })); 
-app.use(express.json());                         
+app.use(express.urlencoded({ extended: true }));                  
 
 // 2.5 Initialize Session Backpacks (Must be before routes!)
 const session = require('express-session');
@@ -30,6 +29,13 @@ app.use(session({
     resave: false,
     saveUninitialized: false
 }));
+
+require('dotenv').config(); // Loads your .env variables
+const Groq = require("groq-sdk");
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
+// Ensure your express app can parse JSON bodies
+app.use(express.json());
 
 // Sectional Title: Root Route Handling for Home/Login Page - 2026-05-18
 app.get('/', (req, res) => {
@@ -139,6 +145,39 @@ app.post('/auth/register', (req, res) => {
             res.redirect('/'); 
         }
     }); 
+
+// --- MILESTONE 9: AI Dialogue Generation Endpoint ---
+app.post('/api/chat', async (req, res) => {
+    try {
+        const playerMessage = req.body.message;
+        const playerProfile = req.body.profile; // We can pass the player's core memory/stats here later!
+
+        const chatCompletion = await groq.chat.completions.create({
+            messages: [
+                {
+                    role: "system",
+                    content: `You are a native, lore-accurate memory entity in the abstract space of 'Fractured Mind'. 
+                              The player's mind is shattered. Speak cryptically but provide hints about sealing anomalies (cracks) and avoiding ghosts. 
+                              CRITICAL RULE: You must restrict your output to a maximum of three (3) sentences. No exceptions.`
+                },
+                {
+                    role: "user",
+                    content: playerMessage
+                }
+            ],
+            // --- UPDATED: Using a current generation model ---
+            model: "llama-3.1-8b-instant", 
+            temperature: 0.7
+        });
+
+        const reply = chatCompletion.choices[0]?.message?.content || "The memory entity remains silent.";
+        res.json({ response: reply });
+
+    } catch (error) {
+        console.error("Groq API Error:", error);
+        res.status(500).json({ error: "Failed to connect to the memory matrix." });
+    }
+});
 
 // 2. Update your /game route to check for the session:
 // Sectional Title: Fetching Session Profile for Game View - 2026-05-18

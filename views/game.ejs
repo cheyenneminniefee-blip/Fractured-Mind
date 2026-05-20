@@ -9,6 +9,16 @@
 
 <div id="game-container">
     <canvas id="gameCanvas"></canvas>
+
+    <div id="ai-chat-overlay" style="display: none;">
+        <div class="chat-history" id="chat-history">
+            <p class="ai-text"><strong>Memory Entity:</strong> Approach, fractured one. What seeks clarity?</p>
+        </div>
+        <div class="chat-input-area">
+            <input type="text" id="chat-input" placeholder="Transmit thought... (Press Enter to send)" autocomplete="off">
+            <button id="chat-send-btn">SEND</button>
+        </div>
+    </div>
 </div>
 
 <style>
@@ -59,6 +69,56 @@
         background-color: #000000;
         border: 2px solid #444455;
         box-shadow: 0 0 30px rgba(0, 0, 0, 0.7);
+    }
+
+    /* AI Chat Overlay Styling */
+    #ai-chat-overlay {
+        position: absolute;
+        bottom: 40px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 600px;
+        max-width: 90%;
+        background: rgba(13, 13, 17, 0.9);
+        border: 1px solid #00ffcc;
+        box-shadow: 0 0 20px rgba(0, 255, 204, 0.3);
+        border-radius: 5px;
+        padding: 15px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        z-index: 100; /* Ensures it sits on top of the canvas */
+    }
+
+    .chat-history {
+        height: 100px;
+        overflow-y: auto;
+        font-size: 14px;
+        line-height: 1.4;
+        color: #cccccc;
+    }
+
+    .ai-text { color: #00ffcc; text-shadow: 0 0 5px rgba(0, 255, 204, 0.5); }
+    .player-text { color: #ffffff; }
+
+    .chat-input-area { display: flex; gap: 10px; }
+
+    #chat-input {
+        flex: 1;
+        background: #111;
+        border: 1px solid #444;
+        color: #fff;
+        padding: 8px;
+        font-family: inherit;
+    }
+
+    #chat-send-btn {
+        background: #00ffcc;
+        color: #000;
+        border: none;
+        padding: 8px 15px;
+        cursor: pointer;
+        font-weight: bold;
     }
 </style>
 <script>
