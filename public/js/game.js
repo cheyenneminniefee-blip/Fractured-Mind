@@ -12,37 +12,42 @@ canvas.height = container.clientHeight - 4;
 // 2. Fetch data from EJS handoff
 const userProfile = window.GAME_STATE.playerProfile;
 
-// 3. Grid Configuration (12 Rows x 20 Columns Matrix)
-// 0 = Open Air Workspace, 1 = Solid Cybernetic Ground Structure
-// Sectional Title: Dynamic Physics Scaling Architecture - 2026-05-19
+// Track active room loading transactions to guard against repetitive calls
+let isTransitioning = false;
+let isChatting = false;
 
-// Sectional Title: Adding Win Conditions to the Grid Engine - 2026-05-19
-
-// 3. Grid Configuration (0 = Air, 1 = Wall, 2 = Goal Portal, 4 = Memory Entity NPC)
-const levelGrid = [
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 1, 1, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1], // Added '4' right here!
-    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+// 3. Grid Configuration (0 = Air, 1 = Wall, 4 = Memory Entity NPC)
+// Changed to 'let' to allow completely dynamic overwrite states!
+let levelGrid = [
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0],
+    [0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 1, 1, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
 ];
 
-// MUST BE CALCULATED BEFORE COMBAT ARRAYS
-const gridRows = levelGrid.length;
-const gridCols = levelGrid[0].length;
-const tileWidth = canvas.width / gridCols;
-const tileHeight = canvas.height / gridRows;
+// Re-allocated to lets to stay dynamic across room shifts
+let gridRows = levelGrid.length;
+let gridCols = levelGrid[0].length;
+
+const viewportCols = 20;
+let tileWidth = canvas.width / viewportCols;
+let tileHeight = canvas.height / gridRows;
+
+let levelWidth = gridCols * tileWidth;
+let levelHeight = gridRows * tileHeight;
+
+const camera = { x: 0, y: 0 };
 
 const scaleX = tileWidth / 40;
 const scaleY = tileHeight / 37.5;
-
 // Sectional Title: Combat & Anomaly Engine Arrays - 2026-05-19
 
 const projectiles = []; // Tracks ranged attacks
@@ -69,48 +74,42 @@ const cracks = [
 
 // 4. Structural Array Compilers
 const platforms = [];
-const goals = []; // New array specifically for extraction points
 const npcs = [];
 
-for (let row = 0; row < gridRows; row++) {
-    for (let col = 0; col < gridCols; col++) {
-        // If it's a 1, build a solid wall
-        if (levelGrid[row][col] === 1) {
-            platforms.push({
-                x: col * tileWidth,
-                y: row * tileHeight,
-                width: tileWidth,
-                height: tileHeight,
-                color: "#1f1f2e",
-            });
-        }
-        // If it's a 2, build a Goal block
-        // If it's a 2, build a Goal block
-        else if (levelGrid[row][col] === 2) {
-            goals.push({
-                x: col * tileWidth,
-                y: row * tileHeight,
-                width: tileWidth,
-                height: tileHeight,
-                color: "#00ffcc", 
-            });
-        }
-        // NEW: If it's a 4, build a Memory Entity NPC
-        else if (levelGrid[row][col] === 4) {
-            npcs.push({
-                x: col * tileWidth,
-                y: row * tileHeight,
-                width: tileWidth,
-                height: tileHeight,
-                color: "#ffff00", // Yellow aura for the NPC
-            });
+// Clean modular compilation routine used both on startup and dynamic transitions
+function compileStructuralBlocks() {
+    platforms.length = 0;
+    npcs.length = 0;
+
+    for (let row = 0; row < gridRows; row++) {
+        for (let col = 0; col < gridCols; col++) {
+            if (levelGrid[row][col] === 1) {
+                platforms.push({
+                    x: col * tileWidth,
+                    y: row * tileHeight,
+                    width: tileWidth,
+                    height: tileHeight,
+                    color: "#1f1f2e",
+                });
+            } else if (levelGrid[row][col] === 4) {
+                npcs.push({
+                    x: col * tileWidth,
+                    y: row * tileHeight,
+                    width: tileWidth,
+                    height: tileHeight,
+                    color: "#ffff00",
+                });
+            }
         }
     }
 }
 
+// Execute baseline structural compilation on runtime start
+compileStructuralBlocks();
+
 // 5. Responsive Platformer Player Object
 const player = {
-    x: canvas.width / 2 - 12.5 * scaleX,
+    x: tileWidth * 3, // Spawns 2 tiles in from the left wall
     y: canvas.height - tileHeight * 2,
 
     // Size scales directly with screen real estate
@@ -200,111 +199,156 @@ function updatePhysics() {
     // 1. Horizontal Acceleration & Friction
     if (keys.a) {
         player.velocityX -= player.speed;
-        player.facingRight = false; // Looking left
+        player.facingRight = false;
     }
     if (keys.d) {
         player.velocityX += player.speed;
-        player.facingRight = true; // Looking right
+        player.facingRight = true;
     }
 
     player.velocityX *= player.friction;
 
     if (player.velocityX > player.maxSpeed) player.velocityX = player.maxSpeed;
-    if (player.velocityX < -player.maxSpeed)
-        player.velocityX = -player.maxSpeed;
+    if (player.velocityX < -player.maxSpeed) player.velocityX = -player.maxSpeed;
 
     // 2. Vertical Gravity & Jumping
     player.velocityY += player.gravity;
 
-    // Only the Spacebar will trigger a jump now
     if (keys[" "] && player.isGrounded) {
         player.velocityY = player.jumpStrength;
         player.isGrounded = false;
     }
 
-    // --- STEP A: X-Axis Movement & Collision Resolution ---
+    // X-Axis Movement & Collision Resolution
     player.x += player.velocityX;
-
     platforms.forEach((platform) => {
-        // Standard AABB Overlap Check
         if (
             player.x < platform.x + platform.width &&
             player.x + player.width > platform.x &&
             player.y < platform.y + platform.height &&
             player.y + player.height > platform.y
         ) {
-            // If moving right, push player to the left edge of the block
             if (player.velocityX > 0) {
                 player.x = platform.x - player.width;
                 player.velocityX = 0;
-            }
-            // If moving left, push player to the right edge of the block
-            else if (player.velocityX < 0) {
+            } else if (player.velocityX < 0) {
                 player.x = platform.x + platform.width;
                 player.velocityX = 0;
             }
         }
     });
 
-    // Outer Boundary Collisions: Left & Right Walls
     if (player.x < 0) {
         player.x = 0;
         player.velocityX = 0;
-    } else if (player.x + player.width > canvas.width) {
-        player.x = canvas.width - player.width;
+    } else if (player.x + player.width > levelWidth) {
+        player.x = levelWidth - player.width;
         player.velocityX = 0;
     }
 
-    // --- STEP B: Y-Axis Movement & Collision Resolution ---
+    // Y-Axis Movement & Collision Resolution
     player.y += player.velocityY;
-    player.isGrounded = false; // Reset before checking floors
+    player.isGrounded = false;
 
     platforms.forEach((platform) => {
-        // Standard AABB Overlap Check (Using updated Y coordinates)
         if (
             player.x < platform.x + platform.width &&
             player.x + player.width > platform.x &&
             player.y < platform.y + platform.height &&
             player.y + player.height > platform.y
         ) {
-            // If falling down, snap to the top of the block (Floor)
             if (player.velocityY > 0) {
                 player.y = platform.y - player.height;
                 player.velocityY = 0;
                 player.isGrounded = true;
-            }
-            // If jumping up, snap to the bottom of the block (Ceiling)
-            else if (player.velocityY < 0) {
+            } else if (player.velocityY < 0) {
                 player.y = platform.y + platform.height;
                 player.velocityY = 0;
             }
         }
     });
 
-    // Outer Boundary Collisions: Main Canvas Floor
     if (player.y + player.height > canvas.height) {
         player.y = canvas.height - player.height;
         player.velocityY = 0;
         player.isGrounded = true;
     }
-    // --- STEP C: Goal Collision Detection ---
-    goals.forEach((goal) => {
-        if (
-            player.x < goal.x + goal.width &&
-            player.x + player.width > goal.x &&
-            player.y < goal.y + goal.height &&
-            player.y + player.height > goal.y
-        ) {
-            // WIN CONDITION TRIGGERED!
-            alert("SYSTEM OVERRIDE: Level Complete.");
 
-            // Reset player to the starting point to "restart" the level for now
-            player.x = canvas.width / 2 - 12.5 * scaleX;
-            player.y = canvas.height - tileHeight * 2;
-            player.velocityX = 0;
-            player.velocityY = 0;
-        }
-    });
+    // Camera follow mechanics and limits
+    camera.x = player.x + player.width / 2 - canvas.width / 2;
+    if (camera.x < 0) camera.x = 0;
+    if (camera.x > levelWidth - canvas.width) camera.x = levelWidth - canvas.width;
+
+    // 3. AI-Procedural Room Transition: Hitting the Right Edge
+    if (player.x + player.width >= levelWidth && !isTransitioning) {
+        isTransitioning = true;
+        player.velocityX = 0;
+        player.velocityY = 0;
+
+        console.log("[Fractured Mind] Compiling dynamic matrix grid via AI...");
+
+        // Erase transient actor entities
+        ghosts.length = 0;
+        projectiles.length = 0;
+        cracks.length = 0;
+
+        // Fetch completely randomized room architectures from endpoint
+        fetch("/api/generate-level", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ difficulty: "Medium" }),
+        })
+            .then((response) => response.json())
+            .then((aiData) => {
+                // Override map architecture grids with AI response payload
+                if (aiData.grid && Array.isArray(aiData.grid)) {
+                    levelGrid = aiData.grid;
+                    gridRows = levelGrid.length;
+                    gridCols = levelGrid[0].length;
+                    tileWidth = canvas.width / viewportCols;
+                    tileHeight = canvas.height / gridRows;
+                    levelWidth = gridCols * tileWidth;
+                    levelHeight = gridRows * tileHeight;
+                }
+
+                // Re-compile platforms and NPCs layout boundaries
+                compileStructuralBlocks();
+
+                // Inject dynamic anomaly spawn nodes
+                aiData.cracks.forEach((aiCrack) => {
+                    cracks.push({
+                        x: aiCrack.x,
+                        y: aiCrack.y,
+                        width: 60 * scaleX,
+                        height: 80 * scaleY,
+                        color: "#ff00ff",
+                        spawnTimer: 0,
+                        spawnRate: aiCrack.spawnRate,
+                        isSealed: false,
+                        sealProgress: 0,
+                        sealMax: 120,
+                    });
+                });
+
+                console.log(`[Fractured Mind] New layout built with ${cracks.length} cracks.`);
+
+                // Snap avatar back to starting boundaries
+                player.x = tileWidth * 3;
+                player.y = canvas.height - tileHeight * 2;
+                camera.x = 0;
+
+                isTransitioning = false;
+            })
+            .catch((err) => {
+                console.error("Procedural matrix load failed.", err);
+
+                // Safety escape gate to keep player from getting permanently locked out
+                player.x = tileWidth * 3;
+                player.y = canvas.height - tileHeight * 2;
+                camera.x = 0;
+                isTransitioning = false;
+            });
+    }
 }
 
 // Sectional Title: Milestone 7 - Combat & AI Physics - 2026-05-19
@@ -316,13 +360,16 @@ function updateCombat() {
     // Determine what happens when the Left Mouse Button is clicked
     if (mouse.leftJustPressed) {
         // 1. RANGED ATTACK (If Right-Click is held to aim)
+        // 1. RANGED ATTACK (If Right-Click is held to aim)
         if (mouse.rightDown && rangedCooldown === 0) {
+            let worldMouseX = mouse.x + camera.x; // Shift mouse to world space
+
             // --- NEW: Check if we are aiming at a crack ---
             let aimingAtCrack = cracks.some((crack) => {
                 return (
                     !crack.isSealed &&
-                    mouse.x > crack.x &&
-                    mouse.x < crack.x + crack.width &&
+                    worldMouseX > crack.x &&
+                    worldMouseX < crack.x + crack.width &&
                     mouse.y > crack.y &&
                     mouse.y < crack.y + crack.height
                 );
@@ -333,7 +380,7 @@ function updateCombat() {
                 // Calculate the exact angle between the player and the mouse cursor
                 let startX = player.x + player.width / 2;
                 let startY = player.y + player.height / 2;
-                let angle = Math.atan2(mouse.y - startY, mouse.x - startX);
+                let angle = Math.atan2(mouse.y - startY, worldMouseX - startX); // USES WORLD MOUSE
 
                 let projectileSpeed = 12 * scaleX;
 
@@ -425,7 +472,13 @@ function updateCombat() {
         p.x += p.velocityX;
         p.y += p.velocityY; // Now moving on both X and Y axes!
 
-        if (p.x < 0 || p.x > canvas.width || p.y < 0 || p.y > canvas.height) {
+        // NEW: Check against the camera's position instead of absolute 0
+        if (
+            p.x < camera.x ||
+            p.x > camera.x + canvas.width ||
+            p.y < 0 ||
+            p.y > canvas.height
+        ) {
             projectiles.splice(i, 1);
         }
     }
@@ -453,29 +506,33 @@ function updateGhosts() {
         if (player.invincibilityTimer > 0) player.invincibilityTimer--;
 
         // Check if ghost is touching the player
-        if (player.invincibilityTimer === 0 &&
-            ghost.x < player.x + player.width && ghost.x + ghost.width > player.x &&
-            ghost.y < player.y + player.height && ghost.y + ghost.height > player.y) {
-
+        if (
+            player.invincibilityTimer === 0 &&
+            ghost.x < player.x + player.width &&
+            ghost.x + ghost.width > player.x &&
+            ghost.y < player.y + player.height &&
+            ghost.y + ghost.height > player.y
+        ) {
             // Take 10 Damage and gain 15 Corruption
             player.currentHealth -= 10;
             player.corruptionLevel = Math.min(100, player.corruptionLevel + 15);
             player.invincibilityTimer = 60; // 1 second of invincibility (60 frames)
 
             // Interrupt any crack sealing progress!
-            cracks.forEach(crack => crack.sealProgress = 0);
+            cracks.forEach((crack) => (crack.sealProgress = 0));
 
             // Knock the player backward
             player.velocityY = -6 * scaleY; // Pop them into the air
-            player.velocityX = (player.x < ghost.x) ? -10 * scaleX : 10 * scaleX;
+            player.velocityX = player.x < ghost.x ? -10 * scaleX : 10 * scaleX;
 
             // Check for Fail State (Death)
             if (player.currentHealth <= 0) {
                 alert("SYSTEM FAILURE: Vital signs lost. Memory fragmented.");
 
-                // Reset Level / Stats
-                player.x = canvas.width / 2 - 12.5 * scaleX;
+                // FIX: Respawn back at safe baseline coordinates instead of screen center
+                player.x = tileWidth * 3;
                 player.y = canvas.height - tileHeight * 2;
+                camera.x = 0; // Reset camera view back to origin
                 player.currentHealth = player.maxHealth;
                 player.corruptionLevel = 0;
             }
@@ -531,7 +588,7 @@ function updateGhosts() {
         if (ghost.hp <= 0) {
             ghosts.splice(i, 1); // Eliminate ghost
             // Decrease corruption by 5 when killing a ghost
-            player.corruptionLevel = Math.max(0, player.corruptionLevel - 5); 
+            player.corruptionLevel = Math.max(0, player.corruptionLevel - 5);
         }
     }
 }
@@ -556,29 +613,37 @@ function updateCracks() {
         }
 
         // Check if player is penalized
-        player.isLockedOut = (player.corruptionLevel >= 100);
+        player.isLockedOut = player.corruptionLevel >= 100;
 
         // --- NEW: LASER SEALING LOGIC (With Lockout Check) ---
         // Verify they are aiming, firing, AND not locked out
+        // Verify they are aiming, firing, AND not locked out
         if (!player.isLockedOut && mouse.rightDown && mouse.leftDown) {
+            let worldMouseX = mouse.x + camera.x; // Shift mouse to world space
 
             // Check if hovering over crack
-            if (mouse.x > crack.x && mouse.x < crack.x + crack.width &&
-                mouse.y > crack.y && mouse.y < crack.y + crack.height) {
-
+            if (
+                worldMouseX > crack.x &&
+                worldMouseX < crack.x + crack.width &&
+                mouse.y > crack.y &&
+                mouse.y < crack.y + crack.height
+            ) {
                 crack.sealProgress++;
 
                 if (crack.sealProgress >= crack.sealMax) {
                     crack.isSealed = true;
                     // Massive corruption cleanse for sealing a crack!
-                    player.corruptionLevel = Math.max(0, player.corruptionLevel - 20);
+                    player.corruptionLevel = Math.max(
+                        0,
+                        player.corruptionLevel - 20,
+                    );
                     console.log("[Fractured Mind] Anomaly Sealed via Laser.");
                 }
             } else {
-                crack.sealProgress = 0; 
+                crack.sealProgress = 0;
             }
         } else {
-            crack.sealProgress = 0; 
+            crack.sealProgress = 0;
         }
     });
 }
@@ -586,6 +651,9 @@ function updateCracks() {
 // 8. Canvas Graphics Painter Pipeline
 function renderGraphics() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.save(); // --- SAVES THE SCREEN STATE ---
+    ctx.translate(-camera.x, 0); // --- MOVES THE CAMERA ---
 
     // Draw compiled structural tiles from array
     ctx.shadowBlur = 0;
@@ -599,24 +667,16 @@ function renderGraphics() {
         ctx.strokeRect(platform.x, platform.y, platform.width, platform.height);
     });
 
-    // Draw the Goal Portals with a glowing effect
-    ctx.shadowBlur = 20;
-    ctx.shadowColor = "#00ffcc";
-    goals.forEach((goal) => {
-        ctx.fillStyle = goal.color;
-        ctx.fillRect(goal.x, goal.y, goal.width, goal.height);
-    });
-
     // --- NEW: Draw Memory Entities (NPCs) ---
     ctx.shadowBlur = 15;
     ctx.shadowColor = "#ffff00";
-    npcs.forEach(npc => {
+    npcs.forEach((npc) => {
         ctx.fillStyle = npc.color;
         ctx.fillRect(npc.x, npc.y, npc.width, npc.height);
 
         // Calculate distance for the UI prompt
-        let dx = (player.x + player.width / 2) - (npc.x + npc.width / 2);
-        let dy = (player.y + player.height / 2) - (npc.y + npc.height / 2);
+        let dx = player.x + player.width / 2 - (npc.x + npc.width / 2);
+        let dy = player.y + player.height / 2 - (npc.y + npc.height / 2);
         let distance = Math.sqrt(dx * dx + dy * dy);
 
         // If player is close, draw the interaction prompt
@@ -625,7 +685,11 @@ function renderGraphics() {
             ctx.fillStyle = "#ffffff";
             ctx.font = `bold ${14 * scaleX}px 'Courier New', monospace`;
             ctx.textAlign = "center";
-            ctx.fillText("[T] Establish Link", npc.x + (npc.width / 2), npc.y - (15 * scaleY));
+            ctx.fillText(
+                "[T] Establish Link",
+                npc.x + npc.width / 2,
+                npc.y - 15 * scaleY,
+            );
         }
     });
 
@@ -665,7 +729,7 @@ function renderGraphics() {
                     player.x + player.width / 2,
                     player.y + player.height / 2,
                 );
-                ctx.lineTo(mouse.x, mouse.y);
+                ctx.lineTo(mouse.x + camera.x, mouse.y);
                 ctx.strokeStyle = "#00ffff";
                 ctx.lineWidth = 4; // Thick, powerful beam
                 ctx.setLineDash([]); // Solid line instead of dotted
@@ -685,7 +749,10 @@ function renderGraphics() {
     if (mouse.rightDown) {
         ctx.beginPath();
         ctx.moveTo(player.x + player.width / 2, player.y + player.height / 2);
-        ctx.lineTo(mouse.x, mouse.y);
+
+        // ADD CAMERA.X HERE to convert Screen Space to World Space
+        ctx.lineTo(mouse.x + camera.x, mouse.y);
+
         ctx.strokeStyle = "rgba(0, 255, 255, 0.4)"; // Faint cyan laser
         ctx.lineWidth = 2;
         ctx.setLineDash([5, 5]); // Makes it a dotted line
@@ -719,21 +786,33 @@ function renderGraphics() {
     ctx.fillStyle = player.color;
     ctx.fillRect(player.x, player.y, player.width, player.height);
 
+    ctx.restore();
+
     // --- NEW: DRAW UI OVERLAYS ---
     // 1. Health Bar (Red)
     ctx.shadowBlur = 0; // Turn off glow for crisp UI
     ctx.fillStyle = "#222222";
     ctx.fillRect(20 * scaleX, 20 * scaleY, 200 * scaleX, 15 * scaleY); // Background
     ctx.fillStyle = "#ff3333";
-    ctx.fillRect(20 * scaleX, 20 * scaleY, (200 * scaleX) * (player.currentHealth / player.maxHealth), 15 * scaleY);
+    ctx.fillRect(
+        20 * scaleX,
+        20 * scaleY,
+        200 * scaleX * (player.currentHealth / player.maxHealth),
+        15 * scaleY,
+    );
     ctx.strokeStyle = "#ffffff";
     ctx.strokeRect(20 * scaleX, 20 * scaleY, 200 * scaleX, 15 * scaleY);
 
     // 2. Corruption Bar (Purple)
     ctx.fillStyle = "#222222";
     ctx.fillRect(20 * scaleX, 45 * scaleY, 200 * scaleX, 15 * scaleY); // Background
-    ctx.fillStyle = "#8a2be2"; 
-    ctx.fillRect(20 * scaleX, 45 * scaleY, (200 * scaleX) * (player.corruptionLevel / 100), 15 * scaleY);
+    ctx.fillStyle = "#8a2be2";
+    ctx.fillRect(
+        20 * scaleX,
+        45 * scaleY,
+        200 * scaleX * (player.corruptionLevel / 100),
+        15 * scaleY,
+    );
     ctx.strokeStyle = "#ffffff";
     ctx.strokeRect(20 * scaleX, 45 * scaleY, 200 * scaleX, 15 * scaleY);
 
@@ -741,17 +820,23 @@ function renderGraphics() {
     if (player.isLockedOut) {
         ctx.fillStyle = "#ff00ff";
         ctx.font = `${16 * scaleX}px 'Courier New', monospace`;
-        ctx.fillText("CRITICAL CORRUPTION: ANOMALY SEALING DISABLED", 20 * scaleX, 85 * scaleY);
+        ctx.fillText(
+            "CRITICAL CORRUPTION: ANOMALY SEALING DISABLED",
+            20 * scaleX,
+            85 * scaleY,
+        );
     }
 }
 
-// 9. Master Frame Loop
 function gameLoop() {
-    updatePhysics();
-    updateCombat();
-    updateGhosts();
-    updateCracks();
-    renderGraphics();
+    // CRITICAL FIX: Halt standard entity cycles if transitioning OR chatting
+    if (!isTransitioning && !isChatting) {
+        updatePhysics();
+        updateCombat();
+        updateGhosts();
+        updateCracks();
+    }
+    renderGraphics(); 
     requestAnimationFrame(gameLoop);
 }
 
@@ -760,24 +845,23 @@ gameLoop();
 
 // Sectional Title: Milestone 9 - AI Dialogue Logic - 2026-05-19
 
-const chatOverlay = document.getElementById('ai-chat-overlay');
-const chatInput = document.getElementById('chat-input');
-const chatHistory = document.getElementById('chat-history');
-const sendBtn = document.getElementById('chat-send-btn');
+const chatOverlay = document.getElementById("ai-chat-overlay");
+const chatInput = document.getElementById("chat-input");
+const chatHistory = document.getElementById("chat-history");
+const sendBtn = document.getElementById("chat-send-btn");
 
-let isChatting = false;
+
 
 // Toggle Chat with the 'T' key
 // Toggle Chat with the 'T' key ONLY when near an NPC
-window.addEventListener('keydown', (e) => {
-    if (e.key.toLowerCase() === 't' && !isChatting) {
-
+window.addEventListener("keydown", (e) => {
+    if (e.key.toLowerCase() === "t" && !isChatting) {
         // --- NEW: Proximity Check ---
         let isNearNPC = false;
 
-        npcs.forEach(npc => {
-            let dx = (player.x + player.width / 2) - (npc.x + npc.width / 2);
-            let dy = (player.y + player.height / 2) - (npc.y + npc.height / 2);
+        npcs.forEach((npc) => {
+            let dx = player.x + player.width / 2 - (npc.x + npc.width / 2);
+            let dy = player.y + player.height / 2 - (npc.y + npc.height / 2);
             let distance = Math.sqrt(dx * dx + dy * dy);
 
             // If player is within interact range
@@ -788,26 +872,26 @@ window.addEventListener('keydown', (e) => {
 
         // Only open chat if the check passed!
         if (isNearNPC) {
-            e.preventDefault(); 
+            e.preventDefault();
             isChatting = true;
-            chatOverlay.style.display = 'flex';
+            chatOverlay.style.display = "flex";
             chatInput.focus();
 
             // Zero out player momentum
             player.velocityX = 0;
-            keys.w = keys.a = keys.s = keys.d = keys[' '] = false; 
+            keys.w = keys.a = keys.s = keys.d = keys[" "] = false;
         }
-    } 
+    }
     // Close Chat with Escape
-    else if (e.key === 'Escape' && isChatting) {
+    else if (e.key === "Escape" && isChatting) {
         closeChat();
     }
 });
 
 function closeChat() {
     isChatting = false;
-    chatOverlay.style.display = 'none';
-    canvas.focus();
+    chatOverlay.style.display = "none";
+    chatInput.value = ""; // Clear input field buffer
 }
 
 // Send Message Logic
@@ -817,7 +901,7 @@ async function sendChatMessage() {
 
     // Display Player Text
     chatHistory.innerHTML += `<p class="player-text"><strong>You:</strong> ${text}</p>`;
-    chatInput.value = ''; // Clear box
+    chatInput.value = ""; // Clear box
     chatHistory.scrollTop = chatHistory.scrollHeight; // Auto-scroll down
 
     // Disable input while waiting for the AI
@@ -825,20 +909,19 @@ async function sendChatMessage() {
     chatInput.placeholder = "Awaiting mental link...";
 
     try {
-        const response = await fetch('/api/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
+        const response = await fetch("/api/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
                 message: text,
-                profile: userProfile // Handing over the EJS profile data for context!
-            })
+                profile: userProfile, // Handing over the EJS profile data for context!
+            }),
         });
 
         const data = await response.json();
 
         // Display AI Text
         chatHistory.innerHTML += `<p class="ai-text"><strong>Memory Entity:</strong> ${data.response}</p>`;
-
     } catch (err) {
         chatHistory.innerHTML += `<p style="color:red;">[SYSTEM ERROR: CONNECTION LOST]</p>`;
     }
@@ -851,21 +934,23 @@ async function sendChatMessage() {
 }
 
 // Event Listeners for the Chat Box
-sendBtn.addEventListener('click', sendChatMessage);
-chatInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') sendChatMessage();
+sendBtn.addEventListener("click", sendChatMessage);
+chatInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") sendChatMessage();
 });
 
 // VERY IMPORTANT: Prevent WASD keys from moving the player WHILE they are typing in the chat box!
 window.addEventListener("keydown", (e) => {
-    if (isChatting) return; // SKIP normal movement input if chatting!
+    // CRITICAL FIX: If the player is focused on typing in the chat input box, 
+    // do not flag game controls!
+    if (document.activeElement === chatInput) return;
 
     const key = e.key.toLowerCase();
     if (key in keys) keys[key] = true;
 });
 
 window.addEventListener("keyup", (e) => {
-    if (isChatting) return; // SKIP normal movement input if chatting!
+    if (document.activeElement === chatInput) return;
 
     const key = e.key.toLowerCase();
     if (key in keys) keys[key] = false;
