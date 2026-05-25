@@ -72,6 +72,11 @@ const cracks = [
     },
 ];
 
+// --- NEW: Progression & Boss Tracking Variables ---
+let levelCount = 1; // Tracks how many rooms the player has cleared
+const upgradesOnMap = []; // Tracks physical upgrade items on the floor
+let boss = null; // Holds the boss entity when spawned
+
 // 4. Structural Array Compilers
 const platforms = [];
 const npcs = [];
@@ -280,27 +285,40 @@ function updatePhysics() {
     if (camera.x > levelWidth - canvas.width) camera.x = levelWidth - canvas.width;
 
     // 3. AI-Procedural Room Transition: Hitting the Right Edge
+    // 3. AI-Procedural Room Transition: Hitting the Right Edge
     if (player.x + player.width >= levelWidth && !isTransitioning) {
         isTransitioning = true;
         player.velocityX = 0;
         player.velocityY = 0;
 
-        console.log("[Fractured Mind] Compiling dynamic matrix grid via AI...");
+        // Advance room progression tracking counter
+        levelCount++;
 
-        // Erase transient actor entities
+        // Shift route to Mirror Boss encounter logic once player hits the 4th room threshold
+        let endpoint = levelCount >= 4 ? "/api/generate-boss-level" : "/api/generate-level";
+        console.log(`[Fractured Mind] Compiling dynamic matrix grid via AI... Loading Room ${levelCount}. Route: ${endpoint}`);
+
+        // Clean out active actor instances and parameters from the previous level matrix
         ghosts.length = 0;
         projectiles.length = 0;
         cracks.length = 0;
+        upgradesOnMap.length = 0; // Reset loose drops on previous screen
 
-        // Fetch completely randomized room architectures from endpoint
-        fetch("/api/generate-level", {
+        // Execute unified endpoint handshake payload extraction
+        fetch(endpoint, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ difficulty: "Medium" }),
         })
             .then((response) => response.json())
             .then((aiData) => {
-                // Override map architecture grids with AI response payload
+                // If the server explicitly sent an error message back
+                if (aiData.error) {
+                    alert("System anomaly detected: " + aiData.error);
+                    window.location.href = "/"; // Kick them back to login
+                    return;
+                }
+                // Override map architecture grids with response matrix dimensions
                 if (aiData.grid && Array.isArray(aiData.grid)) {
                     levelGrid = aiData.grid;
                     gridRows = levelGrid.length;
@@ -314,25 +332,61 @@ function updatePhysics() {
                 // Re-compile platforms and NPCs layout boundaries
                 compileStructuralBlocks();
 
-                // Inject dynamic anomaly spawn nodes
-                aiData.cracks.forEach((aiCrack) => {
-                    cracks.push({
-                        x: aiCrack.x,
-                        y: aiCrack.y,
-                        width: 60 * scaleX,
-                        height: 80 * scaleY,
-                        color: "#ff00ff",
-                        spawnTimer: 0,
-                        spawnRate: aiCrack.spawnRate,
-                        isSealed: false,
-                        sealProgress: 0,
-                        sealMax: 120,
-                    });
-                });
+                // --- BRANCH A: PROCESS BOSS TELEMETRY ENCOUNTER ---
+                if (aiData.bossTelemetry) {
+                    boss = {
+                        x: tileWidth * 20, // Instantiate reflection exactly in center court of room
+                        y: tileHeight * 5,
+                        width: 30 * scaleX,
+                        height: 30 * scaleY,
+                        hp: aiData.bossTelemetry.health,
+                        maxHp: aiData.bossTelemetry.maxHealth,
+                        speed: aiData.bossTelemetry.speed * scaleX,
+                        damage: aiData.bossTelemetry.damage,
+                        abilities: aiData.bossTelemetry.abilities,
+                        color: "#ff0000", // Crimson threat profile indicator mapping
+                        velocityX: 0,
+                        velocityY: 0,
+                        isGrounded: false,
+                        attackCooldown: 0
+                    };
+                    console.log("[Fractured Mind] WARNING: Mirror Boss entity initialized.", aiData.bossTelemetry);
+                } 
+                // --- BRANCH B: PROCESS STANDARD ADVENTURE LAYER ---
+                else {
+                    if (aiData.cracks && Array.isArray(aiData.cracks)) {
+                        aiData.cracks.forEach((aiCrack) => {
+                            cracks.push({
+                                x: aiCrack.x,
+                                y: aiCrack.y,
+                                width: 60 * scaleX,
+                                height: 80 * scaleY,
+                                color: "#ff00ff",
+                                spawnTimer: 0,
+                                spawnRate: aiCrack.spawnRate,
+                                isSealed: false,
+                                sealProgress: 0,
+                                sealMax: 120,
+                            });
+                        });
+                    }
 
-                console.log(`[Fractured Mind] New layout built with ${cracks.length} cracks.`);
+                    // 30% procedural probability baseline check to drop a physical upgrade asset
+                    if (Math.random() > 0.7) {
+                        const types = ["Prismatic Edge", "Speed Thrusters", "Quantum Core"];
+                        upgradesOnMap.push({
+                            x: tileWidth * 15,
+                            y: tileHeight * 8,
+                            width: 20 * scaleX,
+                            height: 20 * scaleY,
+                            type: types[Math.floor(Math.random() * types.length)],
+                            color: "#00ffcc"
+                        });
+                    }
+                    console.log(`[Fractured Mind] New layout built with ${cracks.length} cracks.`);
+                }
 
-                // Snap avatar back to starting boundaries
+                // Snap avatar vector boundaries back to starting baseline coordinates
                 player.x = tileWidth * 3;
                 player.y = canvas.height - tileHeight * 2;
                 camera.x = 0;
@@ -342,7 +396,7 @@ function updatePhysics() {
             .catch((err) => {
                 console.error("Procedural matrix load failed.", err);
 
-                // Safety escape gate to keep player from getting permanently locked out
+                // Fallback escape hatch configuration to block runtime engine freezes
                 player.x = tileWidth * 3;
                 player.y = canvas.height - tileHeight * 2;
                 camera.x = 0;
@@ -488,10 +542,11 @@ function updateCombat() {
 }
 
 function updateGhosts() {
+    // 1. Process Minor Ghost Entities Only
     for (let i = ghosts.length - 1; i >= 0; i--) {
         let ghost = ghosts[i];
 
-        // 1. Pathfinding: Direct Homing Vector
+        // Pathfinding: Direct Homing Vector
         let dx = player.x + player.width / 2 - (ghost.x + ghost.width / 2);
         let dy = player.y + player.height / 2 - (ghost.y + ghost.height / 2);
         let distance = Math.sqrt(dx * dx + dy * dy);
@@ -501,11 +556,9 @@ function updateGhosts() {
             ghost.y += (dy / distance) * ghost.speed;
         }
 
-        // --- NEW: GHOST DAMAGES PLAYER ---
-        // Decrease invincibility frames every tick
+        // Ghost Damages Player
         if (player.invincibilityTimer > 0) player.invincibilityTimer--;
 
-        // Check if ghost is touching the player
         if (
             player.invincibilityTimer === 0 &&
             ghost.x < player.x + player.width &&
@@ -513,32 +566,26 @@ function updateGhosts() {
             ghost.y < player.y + player.height &&
             ghost.y + ghost.height > player.y
         ) {
-            // Take 10 Damage and gain 15 Corruption
             player.currentHealth -= 10;
             player.corruptionLevel = Math.min(100, player.corruptionLevel + 15);
-            player.invincibilityTimer = 60; // 1 second of invincibility (60 frames)
+            player.invincibilityTimer = 60;
 
-            // Interrupt any crack sealing progress!
             cracks.forEach((crack) => (crack.sealProgress = 0));
 
-            // Knock the player backward
-            player.velocityY = -6 * scaleY; // Pop them into the air
+            player.velocityY = -6 * scaleY; 
             player.velocityX = player.x < ghost.x ? -10 * scaleX : 10 * scaleX;
 
-            // Check for Fail State (Death)
             if (player.currentHealth <= 0) {
                 alert("SYSTEM FAILURE: Vital signs lost. Memory fragmented.");
-
-                // FIX: Respawn back at safe baseline coordinates instead of screen center
                 player.x = tileWidth * 3;
                 player.y = canvas.height - tileHeight * 2;
-                camera.x = 0; // Reset camera view back to origin
+                camera.x = 0;
                 player.currentHealth = player.maxHealth;
                 player.corruptionLevel = 0;
             }
         }
 
-        // 2. Combat Resolution: Melee Hits
+        // Minor Ghost Combat Resolution: Melee Hits
         if (
             activeMeleeHitbox &&
             ghost.x < activeMeleeHitbox.x + activeMeleeHitbox.width &&
@@ -546,31 +593,22 @@ function updateGhosts() {
             ghost.y < activeMeleeHitbox.y + activeMeleeHitbox.height &&
             ghost.y + ghost.height > activeMeleeHitbox.y
         ) {
-            // Check the "Hit List" array. If the ghost isn't in it, hit them!
             if (!activeMeleeHitbox.hitEntities.includes(ghost)) {
                 ghost.hp -= 10;
-                activeMeleeHitbox.hitEntities.push(ghost); // Add them to the list!
+                activeMeleeHitbox.hitEntities.push(ghost);
 
-                // Knockback effect
                 let knockbackForce = 20 * scaleX;
-                if (activeMeleeHitbox.direction === "right")
-                    ghost.x += knockbackForce;
-                if (activeMeleeHitbox.direction === "left")
-                    ghost.x -= knockbackForce;
-                if (activeMeleeHitbox.direction === "up")
-                    ghost.y -= knockbackForce;
-                if (activeMeleeHitbox.direction === "down")
-                    ghost.y += knockbackForce;
-                // --- NEW: HOLLOW KNIGHT POGO MECHANIC ---
-                // If we hit them with a downward slash, launch the player up!
+                if (activeMeleeHitbox.direction === "right") ghost.x += knockbackForce;
+                if (activeMeleeHitbox.direction === "left") ghost.x -= knockbackForce;
+                if (activeMeleeHitbox.direction === "up") ghost.y -= knockbackForce;
                 if (activeMeleeHitbox.direction === "down") {
-                    // You can multiply this by a decimal (like 0.8) if you want a shorter pogo
-                    player.velocityY = player.jumpStrength * 0.8;
+                    ghost.y += knockbackForce;
+                    player.velocityY = player.jumpStrength * 0.8; // Pogo mechanic
                 }
             }
         }
 
-        // 3. Combat Resolution: Projectile Hits
+        // Minor Ghost Combat Resolution: Projectile Hits
         for (let j = projectiles.length - 1; j >= 0; j--) {
             let p = projectiles[j];
             if (
@@ -580,15 +618,58 @@ function updateGhosts() {
                 ghost.y + ghost.height > p.y
             ) {
                 ghost.hp -= 5;
-                projectiles.splice(j, 1); // Destroy projectile on impact
+                projectiles.splice(j, 1);
             }
         }
 
-        // 4. Death Check
+        // Death Check for Minor Ghost
         if (ghost.hp <= 0) {
-            ghosts.splice(i, 1); // Eliminate ghost
-            // Decrease corruption by 5 when killing a ghost
+            ghosts.splice(i, 1);
             player.corruptionLevel = Math.max(0, player.corruptionLevel - 5);
+        }
+    }
+
+    // 2. OUTSIDE THE LOOP: Process Boss Combat Resolution Inderpendently
+    if (boss) {
+        // Handle Melee Sword Hits on the Boss Entity
+        if (activeMeleeHitbox) {
+            if (
+                boss.x < activeMeleeHitbox.x + activeMeleeHitbox.width &&
+                boss.x + boss.width > activeMeleeHitbox.x &&
+                boss.y < activeMeleeHitbox.y + activeMeleeHitbox.height &&
+                boss.y + boss.height > activeMeleeHitbox.y
+            ) {
+                if (!activeMeleeHitbox.hitEntities.includes(boss)) {
+                    boss.hp -= 25; // Slices deal 25 combat value
+                    activeMeleeHitbox.hitEntities.push(boss);
+
+                    if (boss.hp <= 0) {
+                        alert("THE MIRROR SHATTERS. Dynamic loop terminated. Mind Restored.");
+                        boss = null;
+                        window.location.href = "/";
+                    }
+                }
+            }
+        }
+
+        // Handle Projectile Contacts on the Boss Entity
+        for (let j = projectiles.length - 1; j >= 0; j--) {
+            let p = projectiles[j];
+            if (
+                boss.x < p.x + p.width &&
+                boss.x + boss.width > p.x &&
+                boss.y < p.y + p.height &&
+                boss.y + boss.height > p.y
+            ) {
+                boss.hp -= 12; // Projectiles deal 12 combat value
+                projectiles.splice(j, 1);
+
+                if (boss.hp <= 0) {
+                    alert("THE MIRROR SHATTERS. Dynamic loop terminated. Mind Restored.");
+                    boss = null;
+                    window.location.href = "/";
+                }
+            }
         }
     }
 }
@@ -597,7 +678,7 @@ function updateCracks() {
     cracks.forEach((crack) => {
         if (crack.isSealed) return; // Skip logic if already sealed
 
-        // Spawn Ghosts (Unchanged)
+        // Spawn Ghosts
         crack.spawnTimer++;
         if (crack.spawnTimer >= crack.spawnRate) {
             ghosts.push({
@@ -615,8 +696,7 @@ function updateCracks() {
         // Check if player is penalized
         player.isLockedOut = player.corruptionLevel >= 100;
 
-        // --- NEW: LASER SEALING LOGIC (With Lockout Check) ---
-        // Verify they are aiming, firing, AND not locked out
+        // --- LASER SEALING LOGIC (With Lockout Check) ---
         // Verify they are aiming, firing, AND not locked out
         if (!player.isLockedOut && mouse.rightDown && mouse.leftDown) {
             let worldMouseX = mouse.x + camera.x; // Shift mouse to world space
@@ -648,6 +728,104 @@ function updateCracks() {
     });
 }
 
+function updateUpgrades() {
+    for (let i = upgradesOnMap.length - 1; i >= 0; i--) {
+        let upg = upgradesOnMap[i];
+
+        // Dynamic AABB Overlap check against Player avatar block bounds
+        if (
+            player.x < upg.x + upg.width && player.x + player.width > upg.x &&
+            player.y < upg.y + upg.height && player.y + player.height > upg.y
+        ) {
+            console.log(`[Progression Synchronizer] Upgrade Secured: ${upg.type}`);
+
+            // Dispatch synchronization handshake packet to flat-file database backend
+            fetch('/api/collect-upgrade', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ upgradeName: upg.type })
+            });
+
+            // Instantaneous local avatar stat injection overrides
+            if (upg.type === "Quantum Core") {
+                player.maxHealth += 25;
+                player.currentHealth = player.maxHealth; // Restore vital status thresholds
+            } else if (upg.type === "Speed Thrusters") {
+                player.speed += 0.15 * scaleX;
+                player.maxSpeed += 1.5 * scaleX;
+            }
+
+            upgradesOnMap.splice(i, 1);
+        }
+    }
+}
+
+function updateBossAI() {
+    if (!boss) return; // Exit loop processing routine if entity is clear
+
+    // Apply baseline environmental gravity velocity vector to boss entity
+    boss.velocityY += player.gravity;
+
+    // Rudimentary absolute tracking pathfinding computation layout
+    let dx = (player.x + player.width / 2) - (boss.x + boss.width / 2);
+    boss.velocityX = (dx > 0) ? boss.speed : -boss.speed;
+
+    // --- WEAPONIZED COPY ABILITY A: SPEED THRUSTERS/DASH SPRINT ---
+    if (boss.abilities.hasDashSprint && Math.abs(dx) > 250 * scaleX) {
+        boss.velocityX *= 2.2; // Accelerate traversal boundaries instantly
+    }
+
+    // --- WEAPONIZED COPY ABILITY B: QUANTUM CORE/HEALING SYSTEM ---
+    if (boss.abilities.hasHealingCore && boss.hp < boss.maxHp) {
+        boss.hp += 0.04; // Run steady incremental health regeneration state
+    }
+
+    // Process horizontal translations and bounding limits
+    boss.x += boss.velocityX;
+    if (boss.x < 0) boss.x = 0;
+    if (boss.x + boss.width > levelWidth) boss.x = levelWidth - boss.width;
+
+    // Process vertical translations and static platform matrix intersections
+    boss.y += boss.velocityY;
+    boss.isGrounded = false;
+
+    platforms.forEach((platform) => {
+        if (boss.x < platform.x + platform.width && boss.x + boss.width > platform.x &&
+            boss.y < platform.y + platform.height && boss.y + boss.height > platform.y) {
+            if (boss.velocityY > 0) {
+                boss.y = platform.y - boss.height;
+                boss.velocityY = 0;
+                boss.isGrounded = true;
+            }
+        }
+    });
+
+    // Mirror jump command patterns if player tracks to an elevated tile platform height
+    if (boss.isGrounded && player.y < boss.y - 40 * scaleY) {
+        boss.velocityY = player.jumpStrength * 1.05;
+    }
+
+    // Process internal weapon attack execution cooldown states
+    if (boss.attackCooldown > 0) boss.attackCooldown--;
+
+    // --- WEAPONIZED COPY ABILITY C: PRISMATIC EDGE RANGE MULTIPLIER ---
+    let threatRange = boss.abilities.hasExtendedRange ? 110 * scaleX : 55 * scaleX;
+
+    if (boss.attackCooldown === 0 && Math.abs(dx) < threatRange && Math.abs(player.y - boss.y) < 80 * scaleY) {
+        if (player.invincibilityTimer === 0) {
+            player.currentHealth -= boss.damage;
+            player.invincibilityTimer = 60;
+
+            // Apply knockback vectors to the player
+            player.velocityY = -6 * scaleY;
+            player.velocityX = player.x < boss.x ? -10 * scaleX : 10 * scaleX;
+
+            boss.attackCooldown = 90; // Provide 1.5 seconds recovery time before boss swings again
+        }
+    }
+}
+
+// 8. Canvas Graphics Painter Pipeline
 // 8. Canvas Graphics Painter Pipeline
 function renderGraphics() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -667,38 +845,31 @@ function renderGraphics() {
         ctx.strokeRect(platform.x, platform.y, platform.width, platform.height);
     });
 
-    // --- NEW: Draw Memory Entities (NPCs) ---
-    ctx.shadowBlur = 15;
-    ctx.shadowColor = "#ffff00";
+    // Draw Memory Entities (NPCs)
     npcs.forEach((npc) => {
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = "#ffff00";
         ctx.fillStyle = npc.color;
         ctx.fillRect(npc.x, npc.y, npc.width, npc.height);
 
-        // Calculate distance for the UI prompt
         let dx = player.x + player.width / 2 - (npc.x + npc.width / 2);
         let dy = player.y + player.height / 2 - (npc.y + npc.height / 2);
-        let distance = Math.sqrt(dx * dx + dy * dy);
-
-        // If player is close, draw the interaction prompt
-        if (distance < 100 * scaleX) {
-            ctx.shadowBlur = 0; // Turn off glow for crisp text
+        if (Math.sqrt(dx * dx + dy * dy) < 100 * scaleX) {
+            ctx.shadowBlur = 0; 
             ctx.fillStyle = "#ffffff";
             ctx.font = `bold ${14 * scaleX}px 'Courier New', monospace`;
             ctx.textAlign = "center";
-            ctx.fillText(
-                "[T] Establish Link",
-                npc.x + npc.width / 2,
-                npc.y - 15 * scaleY,
-            );
+            // FIX: Updated text string to match the registered keyboard configuration file ['E']
+            ctx.fillText("[E] Establish Link", npc.x + npc.width / 2, npc.y - 15 * scaleY);
         }
     });
 
+    // Draw Cracks & Sealing Progress Bars
     cracks.forEach((crack) => {
         if (!crack.isSealed) {
             ctx.shadowBlur = 20;
             ctx.shadowColor = crack.color;
             ctx.fillStyle = crack.color;
-            // Drawing a jagged crack-like polygon instead of a basic square
             ctx.beginPath();
             ctx.moveTo(crack.x, crack.y);
             ctx.lineTo(crack.x + crack.width / 2, crack.y + crack.height / 3);
@@ -708,124 +879,134 @@ function renderGraphics() {
             ctx.closePath();
             ctx.fill();
 
+            // NEW VISUAL FEEDBACK: Render Progress Bar if actively being sealed
             if (crack.sealProgress > 0) {
-                let barWidth = 60 * scaleX;
-                let barHeight = 8 * scaleY;
-                let barX = crack.x + crack.width / 2 - barWidth / 2;
-                let barY = crack.y - 15 * scaleY;
-
-                // Draw Dark Background Bar
-                ctx.fillStyle = "#333333";
-                ctx.fillRect(barX, barY, barWidth, barHeight);
-
-                // Draw Cyan Fill Bar based on current progress
+                ctx.shadowBlur = 0;
+                // Background Bar
+                ctx.fillStyle = "#222222";
+                ctx.fillRect(crack.x, crack.y - 15 * scaleY, crack.width, 6 * scaleY);
+                // Active Fill
                 ctx.fillStyle = "#00ffff";
-                let fillWidth = barWidth * (crack.sealProgress / crack.sealMax);
-                ctx.fillRect(barX, barY, fillWidth, barHeight);
-
-                // Extra visual flair: Thicken the laser sight to a solid beam!
-                ctx.beginPath();
-                ctx.moveTo(
-                    player.x + player.width / 2,
-                    player.y + player.height / 2,
-                );
-                ctx.lineTo(mouse.x + camera.x, mouse.y);
-                ctx.strokeStyle = "#00ffff";
-                ctx.lineWidth = 4; // Thick, powerful beam
-                ctx.setLineDash([]); // Solid line instead of dotted
-                ctx.stroke();
+                ctx.fillRect(crack.x, crack.y - 15 * scaleY, crack.width * (crack.sealProgress / crack.sealMax), 6 * scaleY);
             }
         }
     });
 
+    // Draw Upgrades on Map
+    upgradesOnMap.forEach(upg => {
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = upg.color;
+        ctx.fillStyle = upg.color;
+        ctx.beginPath();
+        ctx.moveTo(upg.x + upg.width/2, upg.y);
+        ctx.lineTo(upg.x + upg.width, upg.y + upg.height/2);
+        ctx.lineTo(upg.x + upg.width/2, upg.y + upg.height);
+        ctx.lineTo(upg.x, upg.y + upg.height/2);
+        ctx.closePath();
+        ctx.fill();
+    });
+
+    // Draw Mirror Boss
+    if (boss) {
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = boss.color;
+        ctx.fillStyle = boss.color;
+        ctx.fillRect(boss.x, boss.y, boss.width, boss.height);
+
+        // Boss Health Bar
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = "#222222";
+        ctx.fillRect(boss.x - 10, boss.y - 20, boss.width + 20, 10);
+        ctx.fillStyle = "#ff0000";
+        ctx.fillRect(boss.x - 10, boss.y - 20, (boss.width + 20) * (boss.hp / boss.maxHp), 10);
+
+        // FIX: Added optional chaining safety checks to guard engine loop cycles against undefined AI objects
+        if (boss.abilities && boss.abilities.hasExtendedRange) {
+            ctx.strokeStyle = "rgba(255, 0, 0, 0.4)";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(boss.x - 30, boss.y - 30, boss.width + 60, boss.height + 60);
+        }
+    }
+
     // Draw Ghosts
     ctx.shadowBlur = 10;
     ctx.shadowColor = "#ff4444";
-    ctx.fillStyle = "rgba(255, 68, 68, 0.7)"; // Semi-transparent red ghosts
-    ghosts.forEach((ghost) => {
-        ctx.fillRect(ghost.x, ghost.y, ghost.width, ghost.height);
-    });
-    // Draw Aiming Laser Sight
+    ctx.fillStyle = "rgba(255, 68, 68, 0.7)"; 
+    ghosts.forEach((ghost) => ctx.fillRect(ghost.x, ghost.y, ghost.width, ghost.height));
+
+    // --- DRAW AIMING & FIRING LASER SIGHT ---
     if (mouse.rightDown) {
+        // Calculate if the crosshair is specifically hovering over an unsealed crack
+        const worldMouseX = mouse.x + camera.x;
+        const worldMouseY = mouse.y;
+
+        const isAimingAtCrack = cracks.some(crack => {
+            return !crack.isSealed &&
+                   worldMouseX >= crack.x &&
+                   worldMouseX <= crack.x + crack.width &&
+                   worldMouseY >= crack.y &&
+                   worldMouseY <= crack.y + crack.height;
+        });
+
         ctx.beginPath();
         ctx.moveTo(player.x + player.width / 2, player.y + player.height / 2);
+        ctx.lineTo(worldMouseX, worldMouseY);
 
-        // ADD CAMERA.X HERE to convert Screen Space to World Space
-        ctx.lineTo(mouse.x + camera.x, mouse.y);
-
-        ctx.strokeStyle = "rgba(0, 255, 255, 0.4)"; // Faint cyan laser
-        ctx.lineWidth = 2;
-        ctx.setLineDash([5, 5]); // Makes it a dotted line
+        // The beam only goes full-power if firing AND properly aligned with a crack target
+        if (mouse.leftDown && !player.isLockedOut && isAimingAtCrack) {
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = "#00ffff";
+            ctx.strokeStyle = "rgba(0, 255, 255, 0.9)"; // Solid hot beam
+            ctx.lineWidth = 4 * scaleX;
+            ctx.setLineDash([]); // Continuous beam
+        } else {
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = "rgba(0, 255, 255, 0.4)"; // Faint tracking sight
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]); // Dashed guide line
+        }
         ctx.stroke();
-        ctx.setLineDash([]); // Reset line dash for other drawings
+        ctx.setLineDash([]); // Reset line dash state for subsequent draw calls
     }
+
     // Draw Ranged Projectiles
     ctx.shadowBlur = 10;
     ctx.shadowColor = "#00ffff";
     ctx.fillStyle = "#ffffff";
-    projectiles.forEach((p) => {
-        ctx.fillRect(p.x, p.y, p.width, p.height);
-    });
+    projectiles.forEach((p) => ctx.fillRect(p.x, p.y, p.width, p.height));
 
     // Draw Melee Arc
     if (activeMeleeHitbox) {
         ctx.shadowBlur = 15;
         ctx.shadowColor = "#ffffff";
         ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
-        ctx.fillRect(
-            activeMeleeHitbox.x,
-            activeMeleeHitbox.y,
-            activeMeleeHitbox.width,
-            activeMeleeHitbox.height,
-        );
+        ctx.fillRect(activeMeleeHitbox.x, activeMeleeHitbox.y, activeMeleeHitbox.width, activeMeleeHitbox.height);
     }
 
-    // Draw Player Avatar Square with Glowing Aura
+    // Draw Player Avatar
     ctx.shadowBlur = 15;
     ctx.shadowColor = player.color;
     ctx.fillStyle = player.color;
     ctx.fillRect(player.x, player.y, player.width, player.height);
 
-    ctx.restore();
+    ctx.restore(); // --- RESTORES SCREEN FOR UI DRAWING ---
 
-    // --- NEW: DRAW UI OVERLAYS ---
-    // 1. Health Bar (Red)
-    ctx.shadowBlur = 0; // Turn off glow for crisp UI
+    // UI Overlays (Health Bar)
+    ctx.shadowBlur = 0; 
     ctx.fillStyle = "#222222";
-    ctx.fillRect(20 * scaleX, 20 * scaleY, 200 * scaleX, 15 * scaleY); // Background
+    ctx.fillRect(20 * scaleX, 20 * scaleY, 200 * scaleX, 15 * scaleY); 
     ctx.fillStyle = "#ff3333";
-    ctx.fillRect(
-        20 * scaleX,
-        20 * scaleY,
-        200 * scaleX * (player.currentHealth / player.maxHealth),
-        15 * scaleY,
-    );
+    ctx.fillRect(20 * scaleX, 20 * scaleY, 200 * scaleX * (player.currentHealth / player.maxHealth), 15 * scaleY);
     ctx.strokeStyle = "#ffffff";
     ctx.strokeRect(20 * scaleX, 20 * scaleY, 200 * scaleX, 15 * scaleY);
 
-    // 2. Corruption Bar (Purple)
+    // UI Overlays (Corruption Bar)
     ctx.fillStyle = "#222222";
-    ctx.fillRect(20 * scaleX, 45 * scaleY, 200 * scaleX, 15 * scaleY); // Background
+    ctx.fillRect(20 * scaleX, 45 * scaleY, 200 * scaleX, 15 * scaleY);
     ctx.fillStyle = "#8a2be2";
-    ctx.fillRect(
-        20 * scaleX,
-        45 * scaleY,
-        200 * scaleX * (player.corruptionLevel / 100),
-        15 * scaleY,
-    );
+    ctx.fillRect(20 * scaleX, 45 * scaleY, 200 * scaleX * (player.corruptionLevel / 100), 15 * scaleY);
     ctx.strokeStyle = "#ffffff";
     ctx.strokeRect(20 * scaleX, 45 * scaleY, 200 * scaleX, 15 * scaleY);
-
-    // 3. Lockout Warning Text
-    if (player.isLockedOut) {
-        ctx.fillStyle = "#ff00ff";
-        ctx.font = `${16 * scaleX}px 'Courier New', monospace`;
-        ctx.fillText(
-            "CRITICAL CORRUPTION: ANOMALY SEALING DISABLED",
-            20 * scaleX,
-            85 * scaleY,
-        );
-    }
 }
 
 function gameLoop() {
@@ -835,6 +1016,8 @@ function gameLoop() {
         updateCombat();
         updateGhosts();
         updateCracks();
+        updateUpgrades(); // <--- REGISTERED IN PROCESSING FLOW
+        updateBossAI();   // <--- REGISTERED IN PROCESSING FLOW
     }
     renderGraphics(); 
     requestAnimationFrame(gameLoop);
@@ -855,7 +1038,7 @@ const sendBtn = document.getElementById("chat-send-btn");
 // Toggle Chat with the 'T' key
 // Toggle Chat with the 'T' key ONLY when near an NPC
 window.addEventListener("keydown", (e) => {
-    if (e.key.toLowerCase() === "t" && !isChatting) {
+        if ((e.key.toLowerCase() === "t" || e.key.toLowerCase() === "e") && !isChatting) {
         // --- NEW: Proximity Check ---
         let isNearNPC = false;
 
@@ -914,7 +1097,8 @@ async function sendChatMessage() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 message: text,
-                profile: userProfile, // Handing over the EJS profile data for context!
+                // EJS compiles template objects into plain text; safely pull from window variables or use the standard payload key 
+                profile: typeof profile !== 'undefined' ? profile : null, 
             }),
         });
 
