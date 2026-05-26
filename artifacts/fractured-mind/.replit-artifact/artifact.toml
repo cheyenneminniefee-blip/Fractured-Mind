@@ -15,7 +15,4 @@ paths = [ "/" ]
 localPort = 3000
 
 [services.development]
-run = "node /home/runner/workspace/server.js"
-
-[services.env]
-PORT = "3000"
+run = "PORT=3000 node /home/runner/workspace/server.js"
