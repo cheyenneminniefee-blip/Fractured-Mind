@@ -52,7 +52,16 @@ app.use(express.json());
 
 // Sectional Title: Root Route Handling for Home/Login Page - 2026-05-18
 app.get("/", (req, res) => {
-    res.render("index");
+    let announcementText = "";
+    try {
+        const adminPath = path.join(__dirname, "data", "admin.json");
+        if (fs.existsSync(adminPath)) {
+            let adminData = JSON.parse(fs.readFileSync(adminPath, "utf8"));
+            announcementText = adminData.announcementText || "";
+        }
+    } catch(e) {}
+
+    res.render("index", { announcementText });
 });
 // Sectional Title: Public Navigation Routes (Register & Dev-Log) - 2026-05-18
 app.get("/register", (req, res) => {
@@ -148,9 +157,70 @@ app.post("/admin/terminate", (req, res) => {
     res.redirect("/search");
 });
 
+// Sectional Title: Aggregated Global Leaderboard Route
 app.get("/leaderboard", (req, res) => {
-    res.render("leaderboard");
-});
+    // 1. Helper to safely read files
+    const readJsonSafe = (fileName) => {
+        try {
+            const filePath = path.join(__dirname, "data", fileName);
+            if (fs.existsSync(filePath)) {
+                return JSON.parse(fs.readFileSync(filePath, "utf8"));
+            }
+        } catch (err) {
+            console.error(`Error reading ${fileName}:`, err);
+        }
+        return [];
+    };
+
+    // 2. Load the raw run histories and player states
+    const rawRuns = readJsonSafe("leaderboard.json");
+    const playerStats = readJsonSafe("player.json");
+
+    // 3. Aggregate data per player (Not per run!)
+    const aggregatedData = {};
+
+    rawRuns.forEach((run) => {
+        const uname = run.username || "Unknown Entity";
+
+        // If this player isn't in our grouped list yet, add them with baseline stats
+        if (!aggregatedData[uname]) {
+            aggregatedData[uname] = {
+                username: uname,
+                totalRuns: 0,
+                victories: 0,
+                highestScore: 0,
+                highestLevel: 0,
+                shortestTime: Infinity, 
+                lowestCorruption: 100 // Default max corruption
+            };
+        }
+
+        let p = aggregatedData[uname];
+
+        // Tally totals
+        p.totalRuns++;
+        if (run.gameCompleted) p.victories++;
+
+        // Find "Bests"
+        if (run.finalScore > p.highestScore) p.highestScore = run.finalScore;
+        if (run.levelsCompleted > p.highestLevel) p.highestLevel = run.levelsCompleted;
+        if (run.totalRuntime && run.totalRuntime < p.shortestTime) p.shortestTime = run.totalRuntime;
+    });
+
+    // 4. Cross-reference player.json to grab their lowest corruption & total kills
+    playerStats.forEach((player) => {
+        const uname = player.username;
+        if (aggregatedData[uname]) {
+            // If they have a corruption level lower than our current record, update it
+            if (player.corruptionLevel !== undefined && player.corruptionLevel < aggregatedData[uname].lowestCorruption) {
+                aggregatedData[uname].lowestCorruption = player.corruptionLevel;
+            }
+            aggregatedData[uname].totalKills = player.totalKills || 0;
+        }
+    });
+
+    // 5. Clean up the data array for the frontend
+    const leaderboardArray = Object.values(aggregatedData).map(p => {
 // Sectional Title: Administrative Control Dashboard Routes - 2026-05-18
 app.get("/admin", (req, res) => {
     // 1. Security Check: Block access if not logged in as admin
@@ -228,13 +298,38 @@ app.get("/admin", (req, res) => {
     res.render("admin", { telemetry });
 });
 
-app.get("/admin-update", (req, res) => {
+// Sectional Title: Serve the Admin Update Form View
+app.get("/admin/update", (req, res) => {
     // Block access if the user hasn't successfully logged in as an admin
     if (!req.session || !req.session.isAdmin) {
-        console.log("[Admin Security] Unauthorized view attempt on /admin-update blocked.");
+        console.log("[Admin Security] Unauthorized view attempt on /admin/update blocked.");
         return res.redirect("/"); // Kick them back to the login screen
     }
+
+    // Serve the admin-update.ejs file
     res.render("admin-update");
+});
+
+// Sectional Title: Save Admin Configurations
+app.post("/admin/update", (req, res) => {
+    if (!req.session || !req.session.isAdmin) return res.redirect("/");
+
+    const adminPath = path.join(__dirname, "data", "admin.json");
+
+    // Parse the numbers from the form payload
+    const newConfig = {
+        levelsUntilBoss: parseInt(req.body.levelsUntilBoss) || 4,
+        playerMaxHealth: parseInt(req.body.playerMaxHealth) || 100,
+        playerMeleeDamage: parseInt(req.body.playerMeleeDamage) || 10,
+        enemyBaseHealth: parseInt(req.body.enemyBaseHealth) || 30,
+        enemyDamage: parseInt(req.body.enemyDamage) || 10,
+        announcementText: req.body.announcementText || ""
+    };
+
+    fs.writeFileSync(adminPath, JSON.stringify(newConfig, null, 2));
+    console.log("[Admin] Game engine configurations updated.");
+
+    res.redirect("/admin"); // Redirect back to the dashboard upon success
 });
 
 // Sectional Title: Registration POST Route Stub - 2026-05-18
@@ -509,6 +604,7 @@ app.post("/api/generate-boss-level", async (req, res) => {
 });
 
 // Sectional Title: Fetching Session Profile for Game View - 2026-05-18
+// Sectional Title: Fetching Session Profile for Game View - 2026-05-18
 app.get("/game", (req, res) => {
     if (!req.session.userId) {
         console.log("[Fractured Mind] Unauthorized access attempt blocked.");
@@ -527,7 +623,31 @@ app.get("/game", (req, res) => {
         return res.redirect("/");
     }
 
-    res.render("game", { profile: userProfile });
+    // --- NEW: Fetch the live Admin Config to pass to the engine! ---
+    let adminConfig = { 
+        levelsUntilBoss: 4, 
+        playerMaxHealth: 100, 
+        playerMeleeDamage: 10, 
+        enemyBaseHealth: 30, 
+        enemyDamage: 10,
+        announcementText: "All systems operational."
+    };
+
+    try {
+        const adminPath = path.join(__dirname, "data", "admin.json");
+        if (fs.existsSync(adminPath)) {
+            let parsed = JSON.parse(fs.readFileSync(adminPath, "utf8"));
+            adminConfig = Array.isArray(parsed) ? parsed[0] : parsed;
+        }
+    } catch(e) {
+        console.error("Error reading admin.json:", e);
+    }
+
+    // --- NEW: Pass BOTH the profile and the adminConfig to the EJS template ---
+    res.render("game", { 
+        profile: userProfile, 
+        adminConfig: adminConfig 
+    });
 });
 
 // Route to completely clear the admin session and exit to homepage

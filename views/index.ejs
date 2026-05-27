@@ -8,6 +8,11 @@
 </head>
 <body>
     <header class="game-intro">
+        <% if (typeof announcementText !== 'undefined' && announcementText !== '') { %>
+            <div style="background-color: #3730a3; color: white; text-align: center; padding: 10px; font-weight: bold; border-top: 1px solid #4f46e5; border-bottom: 1px solid #4f46e5;">
+                [SYSTEM ANNOUNCEMENT]: <%= announcementText %>
+            </div>
+        <% } %>
         <h1>Fractured Mind</h1>
         <p class="summary">An atmospheric, narrative-driven 2D platformer where you navigate fragmented memories, seal reality anomalies, and repair a shattered psyche.</p>
     </header>
@@ -28,5 +33,9 @@
             <p class="redirect-text">New to the rift? <a href="/register">Create a profile here</a>.</p>
         </section>
     </main>
-</body>
+            <footer style="text-align: center; margin-top: 40px; padding: 20px; border-top: 1px solid #333;">
+                <a href="/leaderboard" style="color: #a78bfa; text-decoration: none; margin: 0 15px;">🏆 Global Leaderboard</a>
+                <a href="/dev-log" style="color: #a78bfa; text-decoration: none; margin: 0 15px;">📜 Developer Log</a>
+            </footer>
+        </body>
 </html>

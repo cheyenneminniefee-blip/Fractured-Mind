@@ -123,11 +123,10 @@
     }
 </style>
 <script>
-    // 1. Safely package the server-side profile data into a global window object
-    // We use <%- %> instead of <%= %> to safely output raw JSON
+    // Safely package both profile and admin overrides into the global window object
     window.GAME_STATE = {
-        playerProfile: <%- JSON.stringify(profile) %>
+        playerProfile: <%- JSON.stringify(profile) %>,
+        adminConfig: <%- JSON.stringify(adminConfig) %>
     };
 </script>
-
 <script src="/js/game.js"></script>

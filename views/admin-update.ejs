@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fractured Mind // System Configuration</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        body { background-color: #0d0e12; color: #d1d5db; font-family: monospace; padding: 20px; }
+        .config-container { max-width: 600px; margin: 0 auto; background: #1a1c23; padding: 30px; border-radius: 8px; border: 1px solid #2e3244; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 5px; color: #a78bfa; font-weight: bold; }
+        .form-group input, .form-group textarea { width: 100%; padding: 10px; background: #111318; border: 1px solid #4338ca; color: #fff; box-sizing: border-box; border-radius: 4px; }
+        .btn-save { background: #4338ca; color: white; border: none; padding: 12px 20px; width: 100%; cursor: pointer; font-size: 1.1rem; border-radius: 4px; font-weight: bold; margin-top: 10px; }
+        .btn-save:hover { background: #4f46e5; }
+    </style>
+</head>
+<body>
+
+    <main class="config-container">
+        <h1>⚙️ Overwrite Core Engine Config</h1>
+        <p>Values updated here will instantly inject into the next live runtime.</p>
+
+        <form action="/admin/update" method="POST">
+            <div class="form-group">
+                <label>Rooms Required Until Boss Encouter</label>
+                <input type="number" name="levelsUntilBoss" value="4" required>
+            </div>
+
+            <div class="form-group">
+                <label>Player Max Health</label>
+                <input type="number" name="playerMaxHealth" value="100" required>
+            </div>
+
+            <div class="form-group">
+                <label>Player Melee Damage Output</label>
+                <input type="number" name="playerMeleeDamage" value="10" required>
+            </div>
+
+            <div class="form-group">
+                <label>Enemy Baseline Health (Minor Ghosts)</label>
+                <input type="number" name="enemyBaseHealth" value="30" required>
+            </div>
+
+            <div class="form-group">
+                <label>Enemy Damage Output (Minor Ghosts)</label>
+                <input type="number" name="enemyDamage" value="10" required>
+            </div>
+
+            <div class="form-group">
+                <label>Global Network Broadcast (Home Screen Message)</label>
+                <textarea name="announcementText" rows="3" required>All systems operational.</textarea>
+            </div>
+
+            <button type="submit" class="btn-save">Inject Configuration Update</button>
+        </form>
+
+        <br>
+        <a href="/admin" style="color: #818cf8; text-decoration: none;">&lt; Back to Dashboard</a>
+    </main>
+
+</body>
+</html>

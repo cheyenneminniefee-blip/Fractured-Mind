@@ -1,7 +1,8 @@
-[
-  {
-    "systemMaintenanceMode": false,
-    "globalSpawnRateMultiplier": 1.2,
-    "announcementText": "Anomaly matrix stabilization protocol is currently online."
-  }
-]
+{
+  "levelsUntilBoss": 4,
+  "playerMaxHealth": 100,
+  "playerMeleeDamage": 10,
+  "enemyBaseHealth": 30,
+  "enemyDamage": 10,
+  "announcementText": "All systems operational."
+}

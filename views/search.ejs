@@ -77,6 +77,13 @@
         </div>
 
         <br>
+                <div style="margin-top: 30px; border-top: 1px solid #2e3244; padding-top: 15px;">
+                    <% if (isAdmin) { %>
+                        <a href="/admin" style="color: #818cf8; text-decoration: none; font-weight: bold;">&lt; Return to Admin Dashboard</a>
+                    <% } else { %>
+                        <a href="/game" style="color: #818cf8; text-decoration: none; font-weight: bold;">&lt; Return to Simulation</a>
+                    <% } %>
+                </div>
         <a href="/" style="color: #818cf8; text-decoration: none;">&lt; Return to Main Menu</a>
     </main>
 

@@ -11,6 +11,14 @@ canvas.height = container.clientHeight - 4;
 
 // 2. Fetch data from EJS handoff
 const userProfile = window.GAME_STATE.playerProfile;
+// NEW: Load the admin parameters with safe fallbacks
+const sysConfig = window.GAME_STATE.adminConfig || {
+    levelsUntilBoss: 4,
+    playerMaxHealth: 100,
+    playerMeleeDamage: 10,
+    enemyBaseHealth: 30,
+    enemyDamage: 10,
+};
 
 // Track active room loading transactions to guard against repetitive calls
 let isTransitioning = false;
@@ -171,8 +179,8 @@ const player = {
     friction: 0.85,
     isGrounded: false,
     facingRight: true, // NEW: Tracks which way the player is looking
-    maxHealth: 100,
-    currentHealth: 100,
+    maxHealth: sysConfig.playerMaxHealth,
+    currentHealth: sysConfig.playerMaxHealth,
     corruptionLevel: 0, // Tracks 0 to 100
     isLockedOut: false, // Triggers when Corruption hits 100
     invincibilityTimer: 0, // Prevents instant multi-hit deaths
@@ -334,7 +342,7 @@ function updatePhysics() {
 
         // Shift route to Mirror Boss encounter logic once player hits the 4th room threshold
         let endpoint =
-            levelCount >= 4
+            levelCount >= sysConfig.levelsUntilBoss
                 ? "/api/generate-boss-level"
                 : "/api/generate-level";
         console.log(
@@ -625,7 +633,7 @@ function updateGhosts() {
             ghost.y < player.y + player.height &&
             ghost.y + ghost.height > player.y
         ) {
-            player.currentHealth -= 10;
+            player.currentHealth -= sysConfig.enemyDamage;
             player.corruptionLevel = Math.min(100, player.corruptionLevel + 15);
             player.invincibilityTimer = 60;
 
@@ -653,7 +661,7 @@ function updateGhosts() {
             ghost.y + ghost.height > activeMeleeHitbox.y
         ) {
             if (!activeMeleeHitbox.hitEntities.includes(ghost)) {
-                ghost.hp -= 10;
+                ghost.hp -= sysConfig.playerMeleeDamage;
                 activeMeleeHitbox.hitEntities.push(ghost);
 
                 let knockbackForce = 20 * scaleX;
@@ -752,7 +760,7 @@ function updateCracks() {
                 y: crack.y + crack.height / 2,
                 width: 25 * scaleX,
                 height: 35 * scaleY,
-                hp: 30,
+                hp: sysConfig.enemyBaseHealth,
                 speed: 1.5 * scaleX,
                 hitThisSwing: false,
             });
