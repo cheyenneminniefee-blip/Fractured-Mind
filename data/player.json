@@ -1,1 +1,14 @@
-[]
+[
+  {
+    "username": "playerOne",
+    "totalKills": 45,
+    "cracksClosed": 12,
+    "corruptionLevel": 45
+  },
+  {
+    "username": "playerTwo",
+    "totalKills": 12,
+    "cracksClosed": 2,
+    "corruptionLevel": 100
+  }
+]

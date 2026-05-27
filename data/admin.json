@@ -1,1 +1,7 @@
-[]
+[
+  {
+    "systemMaintenanceMode": false,
+    "globalSpawnRateMultiplier": 1.2,
+    "announcementText": "Anomaly matrix stabilization protocol is currently online."
+  }
+]

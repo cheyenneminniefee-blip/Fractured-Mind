@@ -1,1 +1,4 @@
-[]
+[
+  { "username": "playerOne", "levelsCompleted": 6, "finalScore": 620, "gameCompleted": true },
+  { "username": "playerTwo", "levelsCompleted": 2, "finalScore": 150, "gameCompleted": false }
+]

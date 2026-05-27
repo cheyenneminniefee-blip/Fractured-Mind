@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fractured Mind // Memory Database Search</title>
+    <link rel="stylesheet" href="/style.css"> <style>
+        body { background-color: #0d0e12; color: #d1d5db; font-family: monospace; padding: 20px; }
+        .search-container { max-width: 800px; margin: 0 auto; background: #1a1c23; padding: 30px; border-radius: 8px; border: 1px solid #2e3244; }
+        .search-box { display: flex; gap: 10px; margin-bottom: 30px; }
+        .search-box input { flex-grow: 1; padding: 10px; background: #0d0e12; border: 1px solid #4338ca; color: white; border-radius: 4px; }
+        .search-box button { padding: 10px 20px; background: #4338ca; color: white; border: none; cursor: pointer; border-radius: 4px; font-weight: bold; }
+
+        .profile-card { background: #111318; border: 1px solid #2e3244; border-radius: 6px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .profile-header { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; border-bottom: 1px solid #2e3244; padding-bottom: 10px; }
+        .avatar { width: 50px; height: 50px; border-radius: 50%; background: #333; object-fit: cover; }
+        .profile-header h3 { margin: 0; color: #f3f4f6; font-size: 1.5rem; }
+        .lore-text { color: #9ca3af; font-style: italic; border-left: 3px solid #4338ca; padding-left: 10px; margin: 10px 0; }
+
+        .admin-panel { margin-top: 15px; padding-top: 15px; border-top: 1px dashed #ef4444; }
+        .btn-terminate { background: #7f1d1d; color: #fca5a5; border: 1px solid #ef4444; padding: 8px 15px; cursor: pointer; border-radius: 4px; font-weight: bold; }
+        .btn-terminate:hover { background: #991b1b; color: white; }
+    </style>
+</head>
+<body>
+
+    <main class="search-container">
+        <h1 style="color: #a78bfa;">Access Memory Matrices</h1>
+        <p>Query the global subconscious to locate other synchronized entities.</p>
+
+        <form action="/search" method="GET" class="search-box">
+            <input type="text" name="q" value="<%= searchQuery %>" placeholder="Enter an exact or partial Username..." required>
+            <button type="submit">Initiate Trace</button>
+        </form>
+
+        <div class="results-area">
+            <% if (searchQuery && results.length === 0) { %>
+                <p style="color: #f87171;">[ERR] No neural signatures match the query: "<strong><%= searchQuery %></strong>".</p>
+            <% } else if (results.length > 0) { %>
+
+                <p style="color: #34d399; margin-bottom: 20px;">[SUCCESS] Located <%= results.length %> matching entr(ies).</p>
+
+                <% results.forEach(function(profile) { %>
+                    <div class="profile-card" style="border-left: 5px solid <%= profile.auraColor || '#8A2BE2' %>;">
+
+                        <div class="profile-header">
+                            <% if (profile.avatarUrl) { %>
+                                <img src="<%= profile.avatarUrl %>" alt="Avatar" class="avatar">
+                            <% } else { %>
+                                <div class="avatar"></div>
+                            <% } %>
+                            <h3><%= profile.username %></h3>
+                        </div>
+
+                        <p><strong>Subsystem Bio:</strong> <%= profile.bio || "Data corrupted or missing." %></p>
+                        <p><strong>Current Mind State:</strong> <%= profile.mindState || "Unknown" %></p>
+                        <p><strong>Combat Routine:</strong> <%= profile.combatStyle || "Unspecified" %></p>
+
+                        <div class="lore-text">
+                            <strong>Anchoring Core Memory:</strong><br>
+                            "<%= profile.coreMemory || "..." %>"
+                        </div>
+
+                        <% if (isAdmin) { %>
+                            <div class="admin-panel">
+                                <span style="color: #ef4444; font-weight: bold; display: block; margin-bottom: 10px;">[ADMINISTRATIVE OVERRIDE GRANTED]</span>
+                                <form action="/admin/terminate" method="POST" onsubmit="return confirm('WARNING: Are you sure you want to permanently delete this user and their progression?');">
+                                    <input type="hidden" name="userId" value="<%= profile.userId %>">
+                                    <button type="submit" class="btn-terminate">Terminate Neural Link (Delete Account)</button>
+                                </form>
+                            </div>
+                        <% } %>
+
+                    </div>
+                <% }); %>
+            <% } %>
+        </div>
+
+        <br>
+        <a href="/" style="color: #818cf8; text-decoration: none;">&lt; Return to Main Menu</a>
+    </main>
+
+</body>
+</html>

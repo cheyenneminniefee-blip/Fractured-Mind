@@ -1,0 +1,86 @@
+                        <!DOCTYPE html>
+                        <html lang="en">
+                        <head>
+                            <meta charset="UTF-8">
+                            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                            <title>Fractured Mind // Admin Telemetry Panel</title>
+                            <style>
+                                body { background-color: #0d0e12; color: #d1d5db; font-family: monospace; padding: 20px; line-height: 1.5; }
+                                header { border-bottom: 2px solid #2e3244; padding-bottom: 15px; margin-bottom: 25px; }
+                                h1 { color: #a78bfa; margin: 0; font-size: 1.8rem; }
+                                .system-banner { background: #1e1b4b; border: 1px solid #4338ca; padding: 15px; border-radius: 6px; margin-bottom: 25px; }
+                                .system-banner h2 { margin-top: 0; color: #6366f1; font-size: 1.2rem; }
+                                .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-top: 20px; }
+                                .metric-card { background: #1a1c23; border: 1px solid #2e3244; border-radius: 6px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+                                .metric-card h3 { margin: 0 0 10px 0; color: #9ca3af; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; }
+                                .metric-card .value { font-size: 2.2rem; font-weight: bold; color: #c084fc; }
+                                .metric-card .value.alert { color: #f87171; }
+                                .status-badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; }
+                                .status-active { background-color: #065f46; color: #34d399; }
+                                .status-lockout { background-color: #7f1d1d; color: #f87171; }
+                            </style>
+                        </head>
+                        <body>
+
+                            <header>
+                                <h1>FRACTURED MIND // LIVE TELEMETRY MATRIX</h1>
+                                <p>Core System Diagnostics & Player Analytics Engine</p>
+                            </header>
+
+                            <main>
+                                <section class="system-banner">
+                                    <h2>⚙️ Global System Parameters (admin.json)</h2>
+                                    <p><strong>System Status:</strong> 
+                                        <span class="status-badge <%= telemetry.systemStatus.systemMaintenanceMode ? 'status-lockout' : 'status-active' %>">
+                                            <%= telemetry.systemStatus.systemMaintenanceMode ? "MAINTENANCE LOCKOUT ACTIVE" : "ALL SYSTEMS OPERATIONAL" %>
+                                        </span>
+                                    </p>
+                                    <p><strong>Global Spawn Multiplier:</strong> <code><%= telemetry.systemStatus.globalSpawnRateMultiplier %>x</code></p>
+                                    <p><strong>Network Broadcast Announcement:</strong> "<em><%= telemetry.systemStatus.announcementText %></em>"</p>
+                                </section>
+
+                                <h2>📊 Global Analytics Summary</h2>
+                                <section class="dashboard-grid">
+
+                                    <div class="metric-card">
+                                        <h3>Registered User Profiles</h3>
+                                        <div class="value"><%= telemetry.totalAccounts %></div>
+                                    </div>
+
+                                    <div class="metric-card">
+                                        <h3>Total Runs Attempted</h3>
+                                        <div class="value"><%= telemetry.totalRunsGlobally %></div>
+                                    </div>
+
+                                    <div class="metric-card">
+                                        <h3>Successful Victories</h3>
+                                        <div class="value" style="color: #34d399;"><%= telemetry.gameBeatenCount %></div>
+                                    </div>
+
+                                    <div class="metric-card">
+                                        <h3>Avg Player Corruption</h3>
+                                        <div class="value"><%= telemetry.averageCorruptionLevel %>%</div>
+                                    </div>
+
+                                    <div class="metric-card">
+                                        <h3>Entities Eliminated</h3>
+                                        <div class="value"><%= telemetry.cumulativeEntitiesEliminated %></div>
+                                    </div>
+
+                                    <div class="metric-card">
+                                        <h3>Sky Cracks Sealed</h3>
+                                        <div class="value"><%= telemetry.cumulativeCracksSealed %></div>
+                                    </div>
+
+                                    <div class="metric-card">
+                                        <h3>Active Critical Lockouts</h3>
+                                        <div class="value <%= telemetry.criticalOverloadLockouts > 0 ? 'alert' : '' %>">
+                                            <%= telemetry.criticalOverloadLockouts %>
+                                        </div>
+                                    </div>
+
+                                </section>
+                            </main>
+
+                        </body>
+                        </html>

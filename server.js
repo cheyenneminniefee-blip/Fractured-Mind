@@ -18,8 +18,6 @@ app.get("/api/test-live", (req, res) => {
     res.json({ status: "Server is reading new changes!" });
 });
 
-// ... Leave everything else below this exactly as it was ...
-
 // 2. Middleware (MUST come before routes!)
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
@@ -65,8 +63,89 @@ app.get("/dev-log", (req, res) => {
     res.render("dev-log");
 });
 
+// Sectional Title: Public Profile Search & Admin Moderation - Checkpoint 13
 app.get("/search", (req, res) => {
-    res.render("search");
+    // 1. Grab the search query from the URL (e.g., /search?q=playerOne)
+    const searchQuery = req.query.q ? req.query.q.toLowerCase() : "";
+    let results = [];
+
+    // 2. If a search was executed, filter the database
+    if (searchQuery) {
+        try {
+            let profilesDb = JSON.parse(fs.readFileSync(profilesDbPath, "utf8"));
+
+            // Find all profiles where the username partially or exactly matches the query
+            results = profilesDb.filter((profile) => 
+                profile.username.toLowerCase().includes(searchQuery)
+            );
+        } catch (err) {
+            console.error("[Search Module] Error reading profiles database:", err);
+        }
+    }
+
+    // 3. Security Check: Is the person conducting the search an Admin?
+    const isAdmin = req.session && req.session.isAdmin === true;
+
+    // 4. Render the page with the search results and the admin authorization flag
+    res.render("search", { 
+        results: results, 
+        searchQuery: searchQuery, 
+        isAdmin: isAdmin 
+    });
+});
+
+// Sectional Title: Admin Moderation - Terminate Neural Link
+app.post("/admin/terminate", (req, res) => {
+    // 1. Ultimate Security Guard: Verify they are actually an Admin!
+    if (!req.session || !req.session.isAdmin) {
+        console.log("[Admin Security] Unauthorized termination attempt blocked.");
+        return res.redirect("/"); 
+    }
+
+    // 2. Grab the target user's ID from the hidden input in our form
+    const targetUserId = req.body.userId;
+
+    if (!targetUserId) {
+        console.log("[Moderation] Termination failed: No user ID provided.");
+        return res.redirect("/search");
+    }
+
+    try {
+        console.log(`[Moderation] Initiating termination protocol for User ID: ${targetUserId}`);
+
+        // 3. Read ALL relational databases
+        let usersDb = JSON.parse(fs.readFileSync(usersDbPath, "utf8"));
+        let profilesDb = JSON.parse(fs.readFileSync(profilesDbPath, "utf8"));
+        let gamestateDb = JSON.parse(fs.readFileSync(gamestateDbPath, "utf8"));
+
+        let playerDb = [];
+        if (fs.existsSync(playerDbPath)) {
+            playerDb = JSON.parse(fs.readFileSync(playerDbPath, "utf8"));
+        }
+
+        // 4. Filter out the targeted user from every single database
+        // Note: users.json uses 'id', while the others use 'userId'
+        usersDb = usersDb.filter(user => user.id !== targetUserId);
+        profilesDb = profilesDb.filter(profile => profile.userId !== targetUserId);
+        gamestateDb = gamestateDb.filter(state => state.userId !== targetUserId);
+        playerDb = playerDb.filter(player => player.userId !== targetUserId && player.id !== targetUserId); 
+
+        // 5. Save the scrubbed arrays back to the physical files
+        fs.writeFileSync(usersDbPath, JSON.stringify(usersDb, null, 2));
+        fs.writeFileSync(profilesDbPath, JSON.stringify(profilesDb, null, 2));
+        fs.writeFileSync(gamestateDbPath, JSON.stringify(gamestateDb, null, 2));
+
+        if (fs.existsSync(playerDbPath)) {
+            fs.writeFileSync(playerDbPath, JSON.stringify(playerDb, null, 2));
+        }
+
+        console.log(`[Moderation] Neural Link Terminated. All records scrubbed.`);
+    } catch (error) {
+        console.error("[Moderation Error] Failed to complete data scrub:", error);
+    }
+
+    // 6. Redirect the admin back to the search page so they can keep working
+    res.redirect("/search");
 });
 
 app.get("/leaderboard", (req, res) => {
@@ -74,10 +153,87 @@ app.get("/leaderboard", (req, res) => {
 });
 // Sectional Title: Administrative Control Dashboard Routes - 2026-05-18
 app.get("/admin", (req, res) => {
-    res.render("admin");
+    // 1. Security Check: Block access if not logged in as admin
+    if (!req.session || !req.session.isAdmin) {
+        console.log("[Admin Security] Unauthorized view attempt on /admin blocked.");
+        return res.redirect("/"); 
+    }
+
+    // 2. Helper to safely read flat JSON databases without crashing
+    const readJsonSafe = (fileName) => {
+        try {
+            const filePath = path.join(__dirname, "data", fileName);
+            if (fs.existsSync(filePath)) {
+                return JSON.parse(fs.readFileSync(filePath, "utf8"));
+            }
+        } catch (err) {
+            console.error(`Error reading ${fileName}:`, err);
+        }
+        return []; // Return empty array if file is missing
+    };
+
+    // 3. Load all relational databases
+    const users = readJsonSafe("users.json");
+    const leaderboard = readJsonSafe("leaderboard.json");
+    const playerStats = readJsonSafe("player.json");
+
+    // Parse Admin Settings (with a safe fallback if the file doesn't exist yet)
+    let adminConfig = { systemMaintenanceMode: false, globalSpawnRateMultiplier: 1.0, announcementText: "All systems online." };
+    try {
+        const adminPath = path.join(__dirname, "data", "admin.json");
+        if (fs.existsSync(adminPath)) {
+            let parsed = JSON.parse(fs.readFileSync(adminPath, "utf8"));
+            adminConfig = Array.isArray(parsed) ? parsed[0] : parsed;
+        }
+    } catch(e) {}
+
+    // 4. Compute Dashboard Telemetry Metrics
+    const totalAccounts = users.length;
+    const totalRunsGlobally = leaderboard.length;
+
+    const gameBeatenCount = leaderboard.filter((run) => {
+        return run.levelsCompleted >= 5 || run.gameCompleted === true || run.finalScore >= 500;
+    }).length;
+
+    let cumulativeEntitiesEliminated = 0;
+    let cumulativeCracksSealed = 0;
+    let runningTotalCorruption = 0;
+    let criticalOverloadLockouts = 0;
+
+    playerStats.forEach((player) => {
+        cumulativeEntitiesEliminated += (player.totalKills || 0);
+        cumulativeCracksSealed += (player.cracksClosed || 0);
+        runningTotalCorruption += (player.corruptionLevel || 0);
+
+        if (player.corruptionLevel >= 100) criticalOverloadLockouts++;
+    });
+
+    const averageCorruptionLevel = playerStats.length > 0 
+        ? (runningTotalCorruption / playerStats.length).toFixed(1) 
+        : "0.0";
+
+    // 5. Package the data object
+    const telemetry = {
+        totalAccounts,
+        totalRunsGlobally,
+        gameBeatenCount,
+        cumulativeEntitiesEliminated,
+        cumulativeCracksSealed,
+        criticalOverloadLockouts,
+        averageCorruptionLevel,
+        systemStatus: adminConfig
+    };
+
+    // 6. Render the view AND pass the telemetry data to it!
+    res.render("admin", { telemetry });
 });
 
 app.get("/admin-update", (req, res) => {
+    // Block access if the user hasn't successfully logged in as an admin
+    if (!req.session || !req.session.isAdmin) {
+        console.log("[Admin Security] Unauthorized view attempt on /admin-update blocked.");
+        return res.redirect("/"); // Kick them back to the login screen
+    }
     res.render("admin-update");
 });
 
@@ -155,6 +311,20 @@ app.post("/auth/register", (req, res) => {
 // Sectional Title: Login Authentication Route - 2026-05-18
 app.post("/auth/login", (req, res) => {
     const { username, password } = req.body;
+
+    // 1. CHOOSE YOUR ADMINISTRATIVE CREDENTIALS
+    const ADMIN_USERNAME = "391428";
+    const ADMIN_PASSWORD = "cm012411";
+
+    // 2. INTERCEPT AND EVALUATE FOR ADMINISTRATIVE OVERRIDE
+    if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+        console.log(`[Fractured Mind] Administrative security override successful.`);
+        req.session.userId = "admin-root-id";
+        req.session.isAdmin = true; // Inject secure permission flag into session
+        return res.redirect("/admin"); // Reroute straight to dashboard
+    }
+
+    // 3. FALLBACK FOR STANDARD USER PROFILES (Your existing database search)
     let usersDb = JSON.parse(fs.readFileSync(usersDbPath, "utf8"));
     const validUser = usersDb.find(
         (user) => user.username === username && user.password === password,
@@ -165,6 +335,7 @@ app.post("/auth/login", (req, res) => {
             `[Fractured Mind] Synchronization successful for: ${validUser.username}`,
         );
         req.session.userId = validUser.id;
+        req.session.isAdmin = false; // Ensure standard users don't inherit admin rights
         res.redirect("/game");
     } else {
         console.log(`[Fractured Mind] Failed synchronization attempt.`);
@@ -357,6 +528,14 @@ app.get("/game", (req, res) => {
     }
 
     res.render("game", { profile: userProfile });
+});
+
+// Route to completely clear the admin session and exit to homepage
+app.get("/auth/logout", (req, res) => {
+    req.session.destroy((err) => {
+        if (err) console.error("Error clearing session:", err);
+        res.redirect("/");
+    });
 });
 
 // --- 404 TRAP DIAGNOSTIC ---

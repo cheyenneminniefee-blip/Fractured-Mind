@@ -1,11 +1,98 @@
 import { Router, Request, Response } from "express";
 import Groq from "groq-sdk";
 import crypto from "crypto";
+import fs from "fs";
+import path from "path";
 
 const router = Router();
 
-// Initialize Groq inside this workspace context
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+// Define data directory path relative to working directory
+const DATA_DIR = path.join(process.cwd(), "data");
+
+// Safe file parser utility to guarantee zero server crashes if a JSON file is missing or empty
+const readJsonFile = (filename: string): any[] => {
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    const filePath = path.join(DATA_DIR, filename);
+    if (!fs.existsSync(filePath)) return [];
+    const rawData = fs.readFileSync(filePath, "utf-8");
+    return JSON.parse(rawData || "[]");
+  } catch (error) {
+    console.error(`[Admin Parser] Error reading ${filename}:`, error);
+    return [];
+  }
+};
+
+// Safe configuration reader for administrative control states
+const readAdminConfig = (): any => {
+  try {
+    const filePath = path.join(DATA_DIR, "admin.json");
+    if (!fs.existsSync(filePath)) {
+      return { systemMaintenanceMode: false, globalSpawnRateMultiplier: 1.0, announcementText: "All systems online." };
+    }
+    const rawData = fs.readFileSync(filePath, "utf-8");
+    const parsed = JSON.parse(rawData || "{}");
+    return Array.isArray(parsed) ? parsed[0] : parsed;
+  } catch (error) {
+    return { systemMaintenanceMode: false, globalSpawnRateMultiplier: 1.0, announcementText: "All systems online." };
+  }
+};
+
+// --- NEW: ADMINISTRATIVE TELEMETRY DASHBOARD ROUTE ---
+router.get("/admin", (req: Request, res: Response) => {
+  // 1. Gather all raw flat file collections
+  const users = readJsonFile("users.json");
+  const leaderboard = readJsonFile("leaderboard.json");
+  const playerStats = readJsonFile("player.json");
+  const adminConfig = readAdminConfig();
+
+  // 2. Metrics Aggregation Logic
+  const totalAccounts = users.length;
+  const totalRunsGlobally = leaderboard.length;
+
+  // Hardcoded Victory Threshold: Count any run where level completion is >= 5, or difficulty was Hard, or final score matches win criteria
+  const gameBeatenCount = leaderboard.filter((run: any) => {
+    return run.levelsCompleted >= 5 || run.gameCompleted === true || run.finalScore >= 500;
+  }).length;
+
+  // Contextual Combat & Psychological Metadata
+  let cumulativeEntitiesEliminated = 0;
+  let cumulativeCracksSealed = 0;
+  let runningTotalCorruption = 0;
+  let criticalOverloadLockouts = 0;
+
+  playerStats.forEach((player: any) => {
+    cumulativeEntitiesEliminated += (player.totalKills || 0);
+    cumulativeCracksSealed += (player.cracksClosed || 0);
+    runningTotalCorruption += (player.corruptionLevel || 0);
+
+    // Count how many players are in an active 100% Corruption Lockout state
+    if (player.corruptionLevel >= 100) {
+      criticalOverloadLockouts++;
+    }
+  });
+
+  const averageCorruptionLevel = playerStats.length > 0 
+    ? (runningTotalCorruption / playerStats.length).toFixed(1) 
+    : "0.0";
+
+  // Package computed data for explicit presentation inside views/admin.ejs
+  const telemetry = {
+    totalAccounts,
+    totalRunsGlobally,
+    gameBeatenCount,
+    cumulativeEntitiesEliminated,
+    cumulativeCracksSealed,
+    criticalOverloadLockouts,
+    averageCorruptionLevel,
+    systemStatus: adminConfig
+  };
+
+  // Render out structured template and forward dashboard parameters
+  res.render("admin", { telemetry });
+});
 
 // --- AI Dialogue Generation Endpoint ---
 router.post("/chat", async (req: Request, res: Response): Promise<void> => {
@@ -17,8 +104,8 @@ router.post("/chat", async (req: Request, res: Response): Promise<void> => {
         {
           role: "system",
           content: `You are a native, lore-accurate memory entity in the abstract space of 'Fractured Mind'. 
-                              The player's mind is shattered. Speak cryptically but provide hints about sealing anomalies (cracks) and avoiding ghosts. 
-                              CRITICAL RULE: You must restrict your output to a maximum of three (3) sentences. No exceptions.`,
+                    The player's mind is shattered. Speak cryptically but provide hints about sealing anomalies (cracks) and avoiding ghosts. 
+                    CRITICAL RULE: You must restrict your output to a maximum of two (2) sentences. No exceptions.`,
         },
         {
           role: "user",
@@ -39,6 +126,40 @@ router.post("/chat", async (req: Request, res: Response): Promise<void> => {
   }
 });
 
+// --- CENTRAL DIFFICULTY ADJUSTER MATRIX ---
+const difficultyConfig: Record<
+  string,
+  {
+    maxCracks: number;
+    minSpawnRate: number;
+    maxSpawnRate: number;
+    minTiles: number;
+    maxTiles: number;
+  }
+> = {
+  Easy: {
+    maxCracks: 1,
+    minSpawnRate: 240,
+    maxSpawnRate: 300,
+    minTiles: 55,
+    maxTiles: 70,
+  },
+  Medium: {
+    maxCracks: 2,
+    minSpawnRate: 150,
+    maxSpawnRate: 240,
+    minTiles: 70,
+    maxTiles: 85,
+  },
+  Hard: {
+    maxCracks: 4,
+    minSpawnRate: 90,
+    maxSpawnRate: 150,
+    minTiles: 85,
+    maxTiles: 105,
+  },
+};
+
 // --- AI Procedural Level Generation Endpoint ---
 router.post(
   "/generate-level",
@@ -47,28 +168,35 @@ router.post(
       const difficulty = req.body.difficulty || "Medium";
       const randomSeed = crypto.randomUUID();
 
+      // Read explicit properties matching the current level difficulty
+      const config = difficultyConfig[difficulty] || difficultyConfig["Medium"];
+
       const completion = await groq.chat.completions.create({
         messages: [
           {
             role: "system",
             content: `You are the backend procedural level compiler for the game 'Fractured Mind'.
-                              Your job is to return a raw JSON object containing BOTH a 2D room platform layout and an array of 'cracks'.
+            Your job is to return a raw JSON object containing BOTH a 2D room platform layout and an array of 'cracks'.
 
-                              RULES:
-                              1. Return ONLY valid JSON. No conversational text or markdown blocks.
-                              2. Expected schema layout:
-                                 {
-                                   "grid": [ [12 arrays representing rows, each containing exactly 40 integers] ],
-                                   "cracks": [ {"x": number, "y": number, "spawnRate": number} ]
-                                 }
-                              3. Matrix Layout Guidelines (12 rows x 40 columns):
-                                 - 0 = Open Air Workspace, 1 = Solid Cybernetic Ground, 4 = Memory Entity NPC.
-                                 - Add creative floating jumps/platforms using 1s throughout rows 3 to 10 so the player can climb. 
-                                 - Place exactly one '4' element resting safely on top of a platform block (rows 3 to 10).
+            RULES:
+            1. Return ONLY valid JSON. No conversational text or markdown blocks.
+            2. Expected schema layout:
+               {
+                 "grid": [ [12 arrays representing rows, each containing exactly 40 integers] ],
+                 "cracks": [ {"x": number, "y": number, "spawnRate": number} ]
+               }
+            3. Matrix Layout Guidelines (12 rows x 40 columns):
+               - 0 = Open Air, 1 = Solid Ground, 4 = Memory Entity NPC.
+               - PLATFORM ARCHITECTURE: Form clean, isolated, floating horizontal platform sections. Group floating platform tiles (1s) horizontally in distinct segments of 3 to 6 tiles wide.
+               - NO VERTICAL CLUTTER: Do not scatter single, unconnected dots or stack platform tiles vertically to form tall blocks or walls. 
+               - CLEAR JUMPING PATHS: Leave at least 2 empty rows of open air (0s) directly above every floating platform so the player can cleanly jump between them.
+               - Rows 0, 1, and 2 must be entirely Open Air (0s). Row 11 is a solid baseline floor (all 1s).
+               - Place exactly one '4' element resting safely on top of a floating platform block (rows 3 to 10).
 
-                              CRITICAL QUANTITY LIMITS:
-                              - The TOTAL number of ground blocks (1s) across the entire 12x40 matrix MUST be between 60 and 90 tiles total.
-                              - (Since your floor row takes up exactly 40 tiles, this gives you a budget of 20 to 50 floating platform tiles across rows 3-10). Do not place more or fewer.`,
+            CRITICAL QUANTITY LIMITS FOR ${difficulty.toUpperCase()} DIFFICULTY:
+            - The TOTAL number of ground blocks (1s) across the entire 12x40 matrix MUST be strictly between ${config.minTiles} and ${config.maxTiles} tiles (including the baseline floor).
+            - Generate a minimum of 1 and a maximum of ${config.maxCracks} items in the "cracks" array.
+            - The 'spawnRate' for cracks MUST be an integer between ${config.minSpawnRate} and ${config.maxSpawnRate} (lower frames increase difficulty spawn speed).`,
           },
           {
             role: "user",
@@ -96,7 +224,29 @@ router.post(
         throw new Error("AI returned malformed room matrix schema");
       }
 
-      // --- BACKEND POST-PROCESSING SANITIZATION LAYER ---
+      // =================================================================
+      // ABSOLUTE HARD-CODED CEILING: MAX 5 CRACKS PER LEVEL
+      // =================================================================
+      const ABSOLUTE_MAX_CRACKS = 5;
+
+      if (!Array.isArray(levelData.cracks)) {
+        levelData.cracks = [];
+      }
+
+      if (levelData.cracks.length > ABSOLUTE_MAX_CRACKS) {
+        console.log(
+          `[CRACK SECURITY] Truncating rogue anomalies from ${levelData.cracks.length} down to hard cap of ${ABSOLUTE_MAX_CRACKS}`,
+        );
+        levelData.cracks = levelData.cracks.slice(0, ABSOLUTE_MAX_CRACKS);
+      }
+
+      if (levelData.cracks.length === 0) {
+        levelData.cracks.push({ x: 10 * 50, y: 5 * 50, spawnRate: 180 });
+      }
+
+      // =================================================================
+      // 2. GRID CLEANUP & ROGUE TILE ELIMINATION
+      // =================================================================
       while (levelData.grid.length < 12) {
         levelData.grid.push(Array(40).fill(0));
       }
@@ -123,7 +273,14 @@ router.post(
         }
 
         for (let colIndex = 0; colIndex < 40; colIndex++) {
-          if (levelData.grid[rowIndex][colIndex] === 1) {
+          let tileValue = levelData.grid[rowIndex][colIndex];
+
+          if (tileValue !== 0 && tileValue !== 1 && tileValue !== 4) {
+            levelData.grid[rowIndex][colIndex] = 0;
+            tileValue = 0;
+          }
+
+          if (tileValue === 1) {
             totalPlatforms++;
             if (rowIndex >= 3 && rowIndex <= 10) {
               floatingPlatformCoords.push({ r: rowIndex, c: colIndex });
@@ -132,55 +289,90 @@ router.post(
         }
       }
 
-      const MIN_TOTAL_PLATFORMS = 60;
-      const MAX_TOTAL_PLATFORMS = 90;
-
+      // =================================================================
+      // 3. SMART DELETION
+      // =================================================================
       while (
-        totalPlatforms > MAX_TOTAL_PLATFORMS &&
+        totalPlatforms > config.maxTiles &&
         floatingPlatformCoords.length > 0
       ) {
         const randIndex = Math.floor(
           Math.random() * floatingPlatformCoords.length,
         );
         const { r, c } = floatingPlatformCoords.splice(randIndex, 1)[0];
-        const objectAbove = r > 0 ? levelData.grid[r - 1][c] : 0;
-        if (levelData.grid[r][c] === 1 && objectAbove !== 4) {
-          levelData.grid[r][c] = 0;
-          totalPlatforms--;
+
+        for (let i = 0; i < 3; i++) {
+          const targetCol = c + i;
+          if (targetCol < 40 && levelData.grid[r][targetCol] === 1) {
+            const objectAbove = r > 0 ? levelData.grid[r - 1][targetCol] : 0;
+            if (objectAbove !== 4) {
+              levelData.grid[r][targetCol] = 0;
+              totalPlatforms--;
+            }
+          }
         }
       }
 
+      // =================================================================
+      // 4. SMART PLACEMENT
+      // =================================================================
       let safetyCounter = 0;
-      while (totalPlatforms < MIN_TOTAL_PLATFORMS && safetyCounter < 500) {
+      while (totalPlatforms < config.minTiles && safetyCounter < 100) {
         safetyCounter++;
-        const r = Math.floor(Math.random() * 8) + 3;
-        const c = Math.floor(Math.random() * 40);
-        if (levelData.grid[r][c] === 0) {
-          levelData.grid[r][c] = 1;
-          totalPlatforms++;
+        const r = Math.floor(Math.random() * 7) + 3;
+        const c = Math.floor(Math.random() * 32) + 2;
+        const platLength = Math.min(
+          Math.floor(Math.random() * 3) + 3,
+          config.minTiles - totalPlatforms,
+        );
+
+        let canPlace = true;
+        for (let i = 0; i < platLength; i++) {
+          if (
+            levelData.grid[r][c + i] === 4 ||
+            (r > 0 && levelData.grid[r - 1][c + i] === 4)
+          ) {
+            canPlace = false;
+            break;
+          }
+        }
+
+        if (canPlace) {
+          for (let i = 0; i < platLength; i++) {
+            if (levelData.grid[r][c + i] !== 1) {
+              levelData.grid[r][c + i] = 1;
+              totalPlatforms++;
+            }
+          }
         }
       }
 
-      // --- CONVERT CRACK GRID COORDINATES TO PIXEL SPACE ---
-      const TILE_SIZE = 50; // Match this to whatever tile size your game.js uses!
+      // =================================================================
+      // 5. TRANSLATE VALIDATED CRACKS TO PIXEL SPACE
+      // =================================================================
+      const TILE_SIZE = 50;
 
-      if (Array.isArray(levelData.cracks)) {
-        levelData.cracks = levelData.cracks.map((crack: any) => {
-          // If the AI accidentally provided small grid-relative numbers (like 0-40)
-          // rather than absolute canvas pixels, multiply them up!
-          let pixelX = crack.x < 40 ? crack.x * TILE_SIZE : crack.x;
-          let pixelY = crack.y < 12 ? crack.y * TILE_SIZE : crack.y;
+      levelData.cracks = levelData.cracks.map((crack: any) => {
+        let pixelX = crack.x < 40 ? crack.x * TILE_SIZE : crack.x;
+        let pixelY = crack.y < 12 ? crack.y * TILE_SIZE : crack.y;
 
-          return {
-            x: pixelX,
-            y: pixelY,
-            // Ensure spawnRate has a reasonable fallback frame count minimum
-            spawnRate: crack.spawnRate || 180,
-          };
-        });
-      }
+        let defaultMidpoint = Math.floor(
+          (config.minSpawnRate + config.maxSpawnRate) / 2,
+        );
+        let rawSpawnRate = crack.spawnRate || defaultMidpoint;
+        //  Fixed clean line:
+        let safeSpawnRate = Math.max(
+          config.minSpawnRate,
+          Math.min(config.maxSpawnRate, rawSpawnRate)
+        );
 
-      // Now return the safely converted telemetry to the client
+        return {
+          x: pixelX,
+          y: pixelY,
+          spawnRate: safeSpawnRate,
+        };
+      });
+
       res.json(levelData);
     } catch (error) {
       console.error("Groq Level Gen Error:", error);
