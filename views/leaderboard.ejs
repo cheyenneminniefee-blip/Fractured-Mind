@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fractured Mind // Global Hall of Records</title>
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        body { background-color: #0d0e12; color: #d1d5db; font-family: monospace; padding: 20px; }
+        .leaderboard-container { max-width: 1000px; margin: 0 auto; background: #1a1c23; padding: 30px; border-radius: 8px; border: 1px solid #2e3244; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+
+        .header-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #2e3244; padding-bottom: 15px; }
+        .header-controls h1 { color: #a78bfa; margin: 0; }
+
+        .sort-control { display: flex; align-items: center; gap: 10px; }
+        .sort-control select { padding: 8px 12px; background: #111318; color: #a78bfa; border: 1px solid #4338ca; border-radius: 4px; font-weight: bold; cursor: pointer; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #2e3244; }
+        th { background-color: #111318; color: #818cf8; text-transform: uppercase; letter-spacing: 0.05em; position: sticky; top: 0; }
+        tr:hover { background-color: #1e1b4b; }
+
+        .rank-col { font-weight: bold; color: #facc15; width: 60px; }
+        .highlight { color: #34d399; font-weight: bold; }
+
+        nav { margin-bottom: 20px; }
+        .btn-back { color: #a78bfa; text-decoration: none; border: 1px solid #a78bfa; padding: 6px 12px; border-radius: 4px; font-weight: bold; transition: all 0.2s; }
+        .btn-back:hover { background: #a78bfa; color: #0d0e12; }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <a href="javascript:history.back()" class="btn-back">&lt; Go Back</a>
+    </nav>
+
+    <main class="leaderboard-container">
+        <div class="header-controls">
+            <h1>🏆 Global Subconscious Rankings</h1>
+
+            <div class="sort-control">
+                <label for="sortDropdown">Rank Players By:</label>
+                <select id="sortDropdown" onchange="renderLeaderboard()">
+                    <option value="highestScore">Highest Score</option>
+                    <option value="shortestTime">Fastest Run Time</option>
+                    <option value="lowestCorruption">Lowest Corruption Peak</option>
+                    <option value="highestLevel">Most Levels Cleared</option>
+                    <option value="totalRuns">Most Runs Attempted</option>
+                </select>
+            </div>
+        </div>
+
+        <table id="leaderboardTable">
+            <thead>
+                <tr>
+                    <th>Rank</th>
+                    <th>Neural Identity</th>
+                    <th>Highest Score</th>
+                    <th>Fastest Time (s)</th>
+                    <th>Lowest Corruption</th>
+                    <th>Furthest Level</th>
+                    <th>Total Runs</th>
+                </tr>
+            </thead>
+            <tbody id="leaderboardBody">
+                </tbody>
+        </table>
+    </main>
+
+    <script>
+        // 1. Ingest the aggregated JSON string sent by the backend
+        const rawData = <%- leaderboardData %>;
+
+        // 2. Render function that sorts the array based on the dropdown
+        function renderLeaderboard() {
+            const sortBy = document.getElementById("sortDropdown").value;
+            const tbody = document.getElementById("leaderboardBody");
+            tbody.innerHTML = ""; // Clear current table
+
+            // Sort the array dynamically
+            let sortedData = [...rawData].sort((a, b) => {
+                if (sortBy === "shortestTime") {
+                    // For time and corruption, LOWER is better. (Handle 0 times carefully)
+                    let timeA = a.shortestTime === 0 ? Infinity : a.shortestTime;
+                    let timeB = b.shortestTime === 0 ? Infinity : b.shortestTime;
+                    return timeA - timeB;
+                } else if (sortBy === "lowestCorruption") {
+                    return a.lowestCorruption - b.lowestCorruption;
+                } else {
+                    // For score, level, and runs, HIGHER is better
+                    return b[sortBy] - a[sortBy];
+                }
+            });
+
+            // 3. Inject the sorted rows into the HTML table
+            if (sortedData.length === 0) {
+                tbody.innerHTML = "<tr><td colspan='7' style='text-align:center;'>No synchronization data found in the memory matrix.</td></tr>";
+                return;
+            }
+
+            sortedData.forEach((player, index) => {
+                const row = document.createElement("tr");
+
+                // Format missing or default values nicely
+                const timeDisplay = player.shortestTime > 0 ? `${player.shortestTime}s` : "--";
+                const corruptionDisplay = `${player.lowestCorruption}%`;
+
+                row.innerHTML = `
+                    <td class="rank-col">#${index + 1}</td>
+                    <td style="font-weight: bold; color: #fff;">${player.username}</td>
+                    <td class="${sortBy === 'highestScore' ? 'highlight' : ''}">${player.highestScore}</td>
+                    <td class="${sortBy === 'shortestTime' ? 'highlight' : ''}">${timeDisplay}</td>
+                    <td class="${sortBy === 'lowestCorruption' ? 'highlight' : ''}">${corruptionDisplay}</td>
+                    <td class="${sortBy === 'highestLevel' ? 'highlight' : ''}">${player.highestLevel}</td>
+                    <td class="${sortBy === 'totalRuns' ? 'highlight' : ''}">${player.totalRuns}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // 4. Run the render function immediately on page load to show the default sorting
+        renderLeaderboard();
+    </script>
+
+</body>
+</html>

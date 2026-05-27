@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fractured Mind // Developer Log</title>
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        body { background-color: #0d0e12; color: #d1d5db; font-family: monospace; padding: 20px; line-height: 1.6; }
+        .dev-container { max-width: 800px; margin: 0 auto; }
+
+        nav { margin-bottom: 30px; }
+        .btn-back { color: #a78bfa; text-decoration: none; border: 1px solid #a78bfa; padding: 6px 12px; border-radius: 4px; font-weight: bold; transition: all 0.2s; }
+        .btn-back:hover { background: #a78bfa; color: #0d0e12; }
+
+        header { border-bottom: 2px solid #2e3244; padding-bottom: 20px; margin-bottom: 30px; }
+        h1 { color: #a78bfa; margin: 0 0 10px 0; font-size: 2rem; text-transform: uppercase; letter-spacing: 0.05em; }
+        .subtitle { color: #9ca3af; font-size: 1.1rem; margin: 0; }
+
+        /* The Reusable Checkpoint Card */
+        .checkpoint-card { background: #1a1c23; border: 1px solid #2e3244; border-left: 4px solid #4338ca; border-radius: 6px; padding: 25px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: transform 0.2s; }
+        .checkpoint-card:hover { transform: translateX(5px); border-left-color: #a78bfa; }
+
+        .card-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 15px; border-bottom: 1px solid #2e3244; padding-bottom: 10px; }
+        .checkpoint-title { color: #f3f4f6; font-size: 1.3rem; margin: 0; font-weight: bold; }
+        .checkpoint-date { color: #34d399; font-size: 0.9rem; }
+
+        .checkpoint-desc { color: #d1d5db; margin-bottom: 20px; }
+
+        .github-link { display: inline-block; background: #3730a3; color: white; text-decoration: none; padding: 8px 16px; border-radius: 4px; font-weight: bold; font-size: 0.9rem; transition: background 0.2s; }
+        .github-link:hover { background: #4f46e5; }
+    </style>
+</head>
+<body>
+
+    <div class="dev-container">
+        <nav>
+            <a href="/" class="btn-back">&lt; Return to Home</a>
+        </nav>
+
+        <header>
+            <h1>System Commits // Dev Log</h1>
+            <p class="subtitle">An archival record of the engine's architectural progression and GitHub milestones.</p>
+        </header>
+
+        <main>
+            <article class="checkpoint-card">
+                <div class="card-header">
+                    <h2 class="checkpoint-title">Checkpoint #01: Project Setup</h2>
+                    <span class="checkpoint-date">5/18/2026</span>
+                </div>
+                <div class="checkpoint-desc">
+                    <p>Just getting the basics for the project set up.</p>
+                </div>
+                <a href="https://github.com/cheyenneminniefee-blip/Fractured-Mind/commit/127f3ea7292ffff555d8ec1880994bb11d3dd412" target="_blank" class="github-link">View Commit on GitHub ➔</a>
+            </article>
+            <article class="checkpoint-card">
+                <div class="card-header">
+                    <h2 class="checkpoint-title">Checkpoint #02: Navigation Routing</h2>
+                    <span class="checkpoint-date">5/19/2026</span>
+                </div>
+                <div class="checkpoint-desc">
+                    <p>Added the express gateways to make sure the game can move through the different pages properly. Also added the basis for the registration system.</p>
+                </div>
+                <a href="https://github.com/cheyenneminniefee-blip/Fractured-Mind/commit/adec49abe373b3bc866e1ae2e109751b1ea9c84a" target="_blank" class="github-link">View Commit on GitHub ➔</a>
+            </article>
+            <article class="checkpoint-card">
+                <div class="card-header">
+                    <h2 class="checkpoint-title">Checkpoint #03: User Authentication</h2>
+                    <span class="checkpoint-date">5/19/2026</span>
+                </div>
+                <div class="checkpoint-desc">
+                    <p>Completed basic user login and sign-up system.</p>
+                </div>
+                <a href="https://github.com/cheyenneminniefee-blip/Fractured-Mind/commit/256932a3f614b7f86f944a38c50abd07ea6ce9d9" target="_blank" class="github-link">View Commit on GitHub ➔</a>
+            </article>
+            <article class="checkpoint-card">
+                <div class="card-header">
+                    <h2 class="checkpoint-title">Checkpoint #04: Expanded Profiles</h2>
+                    <span class="checkpoint-date">5/19/2026</span>
+                </div>
+                <div class="checkpoint-desc">
+                    <p>Created a basic profile system for the players to provide a bit of data about themselves.</p>
+                </div>
+                <a href="https://github.com/cheyenneminniefee-blip/Fractured-Mind/commit/151c066e0ce30771714f6d1268024c14aa720a1a" target="_blank" class="github-link">View Commit on GitHub ➔</a>
+            </article>
+            <article class="checkpoint-card">
+                <div class="card-header">
+                    <h2 class="checkpoint-title">Checkpoint #05: Game Engine Physics</h2>
+                    <span class="checkpoint-date">5/19/2026</span>
+                </div>
+                <div class="checkpoint-desc">
+                    <p>Created the base platformer experince with player controls and physics.</p>
+                </div>
+                <a href="https://github.com/cheyenneminniefee-blip/Fractured-Mind/commit/0a1a3adf9998cbf9fad9d787d9e8ccaf06ac62b4" target="_blank" class="github-link">View Commit on GitHub ➔</a>
+            </article>
+            <article class="checkpoint-card">
+                <div class="card-header">
+                    <h2 class="checkpoint-title">Checkpoint #06: Level Grid Rendering</h2>
+                    <span class="checkpoint-date">5/19/2026</span>
+                </div>
+                <div class="checkpoint-desc">
+                    <p>Added the logic that builds each level based on a grid system.</p>
+                </div>
+                <a href="https://github.com/cheyenneminniefee-blip/Fractured-Mind/commit/8686e655b8d85541fabf81d760d3ae22510c6045" target="_blank" class="github-link">View Commit on GitHub ➔</a>
+            </article>
+            </article>
+            <article class="checkpoint-card">
+                <div class="card-header">
+                    <h2 class="checkpoint-title">Checkpoint #06: Level Grid Rendering</h2>
+                    <span class="checkpoint-date">5/19/2026</span>
+                </div>
+                <div class="checkpoint-desc">
+                    <p>Added the logic that builds each level based on a grid system.</p>
+                </div>
+                <a href="https://github.com/cheyenneminniefee-blip/Fractured-Mind/commit/8686e655b8d85541fabf81d760d3ae22510c6045" target="_blank" class="github-link">View Commit on GitHub ➔</a>
+            </article>
+            <article class="checkpoint-card">
+                <div class="card-header">
+                    <h2 class="checkpoint-title">Checkpoint #07: Combat and AI Integration</h2>
+                    <span class="checkpoint-date">5/20/2026</span>
+                </div>
+                <div class="checkpoint-desc">
+                    <p>Added the enemy and combat logic to provide the main gameplay of teh game.</p>
+                </div>
+                <a href="https://github.com/cheyenneminniefee-blip/Fractured-Mind/commit/ba7924aceccd7e3b5c475748bced4382fa62c390" target="_blank" class="github-link">View Commit on GitHub ➔</a>
+            </article>
+            <article class="checkpoint-card">
+                <div class="card-header">
+                    <h2 class="checkpoint-title">Checkpoint #08: AI Level Generation</h2>
+                    <span class="checkpoint-date">5/21/2026</span>
+                </div>
+                <div class="checkpoint-desc">
+                    <p>Each level is not entirely generated and built by Groq AI.</p>
+                </div>
+                <a href="https://github.com/cheyenneminniefee-blip/Fractured-Mind/commit/fd5a3cb08efd372d5d17d76cf3c3e04c6e431059" target="_blank" class="github-link">View Commit on GitHub ➔</a>
+            </article>
+            <article class="checkpoint-card">
+                <div class="card-header">
+                    <h2 class="checkpoint-title">Checkpoint #09: Admin Page and Data</h2>
+                    <span class="checkpoint-date">5/27/2026</span>
+                </div>
+                <div class="checkpoint-desc">
+                    <p>Provided anybody with an admin login with access to specific data related to their game.</p>
+                </div>
+                <a href="https://github.com/cheyenneminniefee-blip/Fractured-Mind/commit/aeb8cf84875f9220104d405a7a5803522c9c2ecd" target="_blank" class="github-link">View Commit on GitHub ➔</a>
+            </article>
+            <article class="checkpoint-card">
+                <div class="card-header">
+                    <h2 class="checkpoint-title">Checkpoint #10: Admin Data Changes and Leaderboard</h2>
+                    <span class="checkpoint-date">5/27/2026</span>
+                </div>
+                <div class="checkpoint-desc">
+                    <p>Gave the admin panel the ability to update data from within the game. Also added the leaderboard.</p>
+                </div>
+                <a href="https://github.com/cheyenneminniefee-blip/Fractured-Mind/commit/0f19da8c13dbf0404359a1c22ce1970c9e3aa781" target="_blank" class="github-link">View Commit on GitHub ➔</a>
+            </article>
+            </main>
+    </div>
+
+</body>
+</html>

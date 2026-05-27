@@ -874,10 +874,14 @@ function updateBossAI() {
             boss.y < platform.y + platform.height &&
             boss.y + boss.height > platform.y
         ) {
+            // FIX: Added bidirectional Y-axis collision
             if (boss.velocityY > 0) {
                 boss.y = platform.y - boss.height;
                 boss.velocityY = 0;
                 boss.isGrounded = true;
+            } else if (boss.velocityY < 0) {
+                boss.y = platform.y + platform.height;
+                boss.velocityY = 0;
             }
         }
     });
@@ -902,6 +906,8 @@ function updateBossAI() {
     ) {
         if (player.invincibilityTimer === 0) {
             player.currentHealth -= boss.damage;
+            // FIX: Added corruption spike on boss hit
+            player.corruptionLevel = Math.min(100, player.corruptionLevel + 25);
             player.invincibilityTimer = 60;
 
             // Apply knockback vectors to the player
@@ -909,11 +915,23 @@ function updateBossAI() {
             player.velocityX = player.x < boss.x ? -10 * scaleX : 10 * scaleX;
 
             boss.attackCooldown = 90; // Provide 1.5 seconds recovery time before boss swings again
+
+            // FIX: Added the vital signs death check
+            if (player.currentHealth <= 0) {
+                alert(
+                    "SYSTEM FAILURE: Overwhelmed by the Mirror. Memory fragmented.",
+                );
+                player.x = tileWidth * 3;
+                player.y = canvas.height - tileHeight * 2;
+                camera.x = 0;
+                player.currentHealth = player.maxHealth;
+                player.corruptionLevel = 0;
+                boss.hp = boss.maxHp; // Punish the player by fully healing the boss on death
+            }
         }
     }
 }
 
-// 8. Canvas Graphics Painter Pipeline
 // 8. Canvas Graphics Painter Pipeline
 function renderGraphics() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -1010,8 +1028,16 @@ function renderGraphics() {
 
     // Draw Mirror Boss
     if (boss) {
-        ctx.shadowBlur = 20;
-        ctx.shadowColor = boss.color;
+        // --- VISUAL TELEGRAPH: DASH SPRINT ---
+        // Change the shadow to a hot blue if the boss is in a speed-boosted state
+        if (boss.abilities && boss.abilities.hasDashSprint) {
+            ctx.shadowBlur = 30;
+            ctx.shadowColor = "#00ffff";
+        } else {
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = boss.color;
+        }
+
         ctx.fillStyle = boss.color;
         ctx.fillRect(boss.x, boss.y, boss.width, boss.height);
 
@@ -1027,7 +1053,24 @@ function renderGraphics() {
             10,
         );
 
-        // FIX: Added optional chaining safety checks to guard engine loop cycles against undefined AI objects
+        // --- VISUAL TELEGRAPH: HEALING CORE ---
+        // Draw a restorative green aura if the boss is actively healing
+        if (
+            boss.abilities &&
+            boss.abilities.hasHealingCore &&
+            boss.hp < boss.maxHp
+        ) {
+            ctx.strokeStyle = "rgba(0, 255, 100, 0.6)";
+            ctx.lineWidth = 3;
+            ctx.strokeRect(
+                boss.x - 5,
+                boss.y - 5,
+                boss.width + 10,
+                boss.height + 10,
+            );
+        }
+
+        // --- VISUAL TELEGRAPH: PRISMATIC EDGE ---
         if (boss.abilities && boss.abilities.hasExtendedRange) {
             ctx.strokeStyle = "rgba(255, 0, 0, 0.4)";
             ctx.lineWidth = 2;
@@ -1107,10 +1150,22 @@ function renderGraphics() {
     // Draw Player Avatar
     ctx.shadowBlur = 15;
     ctx.shadowColor = player.color;
-    ctx.fillStyle = player.color;
+
+    // --- VISUAL FEEDBACK: DAMAGE I-FRAMES ---
+    // Make the player blink by alternating transparency based on the internal clock
+    if (player.invincibilityTimer > 0) {
+        if (Math.floor(Date.now() / 100) % 2 === 0) {
+            ctx.fillStyle = "rgba(255, 255, 255, 0.3)"; // Ghostly transparent
+        } else {
+            ctx.fillStyle = player.color; // Solid
+        }
+    } else {
+        ctx.fillStyle = player.color; // Default state
+    }
+
     ctx.fillRect(player.x, player.y, player.width, player.height);
 
-    ctx.restore(); // --- RESTORES SCREEN FOR UI DRAWING ---
+    ctx.restore();
 
     // UI Overlays (Health Bar)
     ctx.shadowBlur = 0;

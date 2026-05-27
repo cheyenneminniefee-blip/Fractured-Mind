@@ -158,69 +158,80 @@ app.post("/admin/terminate", (req, res) => {
 });
 
 // Sectional Title: Aggregated Global Leaderboard Route
-app.get("/leaderboard", (req, res) => {
-    // 1. Helper to safely read files
-    const readJsonSafe = (fileName) => {
-        try {
-            const filePath = path.join(__dirname, "data", fileName);
-            if (fs.existsSync(filePath)) {
-                return JSON.parse(fs.readFileSync(filePath, "utf8"));
-            }
-        } catch (err) {
-            console.error(`Error reading ${fileName}:`, err);
-        }
-        return [];
-    };
-
-    // 2. Load the raw run histories and player states
-    const rawRuns = readJsonSafe("leaderboard.json");
-    const playerStats = readJsonSafe("player.json");
-
-    // 3. Aggregate data per player (Not per run!)
-    const aggregatedData = {};
-
-    rawRuns.forEach((run) => {
-        const uname = run.username || "Unknown Entity";
-
-        // If this player isn't in our grouped list yet, add them with baseline stats
-        if (!aggregatedData[uname]) {
-            aggregatedData[uname] = {
-                username: uname,
-                totalRuns: 0,
-                victories: 0,
-                highestScore: 0,
-                highestLevel: 0,
-                shortestTime: Infinity, 
-                lowestCorruption: 100 // Default max corruption
+        // Sectional Title: Aggregated Global Leaderboard Route
+        app.get("/leaderboard", (req, res) => {
+            // 1. Helper to safely read files
+            const readJsonSafe = (fileName) => {
+                try {
+                    const filePath = path.join(__dirname, "data", fileName);
+                    if (fs.existsSync(filePath)) {
+                        return JSON.parse(fs.readFileSync(filePath, "utf8"));
+                    }
+                } catch (err) {
+                    console.error(`Error reading ${fileName}:`, err);
+                }
+                return [];
             };
-        }
 
-        let p = aggregatedData[uname];
+            // 2. Load the raw run histories and player states
+            const rawRuns = readJsonSafe("leaderboard.json");
+            const playerStats = readJsonSafe("player.json");
 
-        // Tally totals
-        p.totalRuns++;
-        if (run.gameCompleted) p.victories++;
+            // 3. Aggregate data per player (Not per run!)
+            const aggregatedData = {};
 
-        // Find "Bests"
-        if (run.finalScore > p.highestScore) p.highestScore = run.finalScore;
-        if (run.levelsCompleted > p.highestLevel) p.highestLevel = run.levelsCompleted;
-        if (run.totalRuntime && run.totalRuntime < p.shortestTime) p.shortestTime = run.totalRuntime;
-    });
+            rawRuns.forEach((run) => {
+                const uname = run.username || "Unknown Entity";
 
-    // 4. Cross-reference player.json to grab their lowest corruption & total kills
-    playerStats.forEach((player) => {
-        const uname = player.username;
-        if (aggregatedData[uname]) {
-            // If they have a corruption level lower than our current record, update it
-            if (player.corruptionLevel !== undefined && player.corruptionLevel < aggregatedData[uname].lowestCorruption) {
-                aggregatedData[uname].lowestCorruption = player.corruptionLevel;
-            }
-            aggregatedData[uname].totalKills = player.totalKills || 0;
-        }
-    });
+                // If this player isn't in our grouped list yet, add them with baseline stats
+                if (!aggregatedData[uname]) {
+                    aggregatedData[uname] = {
+                        username: uname,
+                        totalRuns: 0,
+                        victories: 0,
+                        highestScore: 0,
+                        highestLevel: 0,
+                        shortestTime: Infinity, 
+                        lowestCorruption: 100 // Default max corruption
+                    };
+                }
 
-    // 5. Clean up the data array for the frontend
-    const leaderboardArray = Object.values(aggregatedData).map(p => {
+                let p = aggregatedData[uname];
+
+                // Tally totals
+                p.totalRuns++;
+                if (run.gameCompleted) p.victories++;
+
+                // Find "Bests"
+                if (run.finalScore > p.highestScore) p.highestScore = run.finalScore;
+                if (run.levelsCompleted > p.highestLevel) p.highestLevel = run.levelsCompleted;
+                if (run.totalRuntime && run.totalRuntime < p.shortestTime) p.shortestTime = run.totalRuntime;
+            });
+
+            // 4. Cross-reference player.json to grab their lowest corruption & total kills
+            playerStats.forEach((player) => {
+                const uname = player.username;
+                if (aggregatedData[uname]) {
+                    // If they have a corruption level lower than our current record, update it
+                    if (player.corruptionLevel !== undefined && player.corruptionLevel < aggregatedData[uname].lowestCorruption) {
+                        aggregatedData[uname].lowestCorruption = player.corruptionLevel;
+                    }
+                    aggregatedData[uname].totalKills = player.totalKills || 0;
+                }
+            });
+
+            // 5. Clean up the data array for the frontend
+            const leaderboardArray = Object.values(aggregatedData).map(p => {
+                // If they never recorded a valid time, set it to 0 instead of Infinity
+                if (p.shortestTime === Infinity) p.shortestTime = 0; 
+                return p;
+            });
+
+            // 6. Pass the compiled array as a JSON string to the frontend EJS
+            res.render("leaderboard", { 
+                leaderboardData: JSON.stringify(leaderboardArray) 
+            });
+        });
 // Sectional Title: Administrative Control Dashboard Routes - 2026-05-18
 app.get("/admin", (req, res) => {
     // 1. Security Check: Block access if not logged in as admin

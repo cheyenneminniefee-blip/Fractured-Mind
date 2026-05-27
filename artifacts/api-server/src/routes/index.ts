@@ -6,6 +6,10 @@ import path from "path";
 
 const router = Router();
 
+// --- THE FIX: Initialize the Groq client ---
+// This assumes you have your GROQ_API_KEY set in your .env file
+const groq = new Groq(); 
+
 // Define data directory path relative to working directory
 const DATA_DIR = path.join(process.cwd(), "data");
 
@@ -95,11 +99,18 @@ router.get("/admin", (req: Request, res: Response) => {
 });
 
 // --- AI Dialogue Generation Endpoint ---
-router.post("/chat", async (req: Request, res: Response): Promise<void> => {
-  try {
-    const playerMessage = req.body.message;
+      router.post("/chat", async (req: Request, res: Response): Promise<void> => {
+        try {
+          const playerMessage = req.body.message;
 
-    const chatCompletion = await groq.chat.completions.create({
+          // FIX: Prevent fatal API crashes by intercepting empty/invalid inputs
+          if (!playerMessage || typeof playerMessage !== "string" || playerMessage.trim() === "") {
+              res.json({ response: "The memory entity stares blankly. It requires input." });
+              return; 
+          }
+
+          const chatCompletion = await groq.chat.completions.create({
+            // ... [rest of your AI call remains the same]
       messages: [
         {
           role: "system",

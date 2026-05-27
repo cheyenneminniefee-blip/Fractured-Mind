@@ -53,8 +53,7 @@ app.use(express.urlencoded({ extended: true }));
 // =================================================================
 // ROUTE MOUNTING
 // =================================================================
-// CHANGED: Mounted at "/" instead of "/api" so that your web UI views 
-// (like /admin, /leaderboard, /search) serve on clean, user-friendly URLs.
-app.use("/", router);
+// Mount at "/api" so routes match the proxy path prefix (paths are not rewritten by proxy).
+app.use("/api", router);
 
 export default app;
