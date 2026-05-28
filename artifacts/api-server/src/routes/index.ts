@@ -8,7 +8,7 @@ const router = Router();
 
 // --- THE FIX: Initialize the Groq client ---
 // This assumes you have your GROQ_API_KEY set in your .env file
-const groq = new Groq(); 
+const groq = new Groq();
 
 // Define data directory path relative to working directory
 const DATA_DIR = path.join(process.cwd(), "data");
@@ -34,13 +34,21 @@ const readAdminConfig = (): any => {
   try {
     const filePath = path.join(DATA_DIR, "admin.json");
     if (!fs.existsSync(filePath)) {
-      return { systemMaintenanceMode: false, globalSpawnRateMultiplier: 1.0, announcementText: "All systems online." };
+      return {
+        systemMaintenanceMode: false,
+        globalSpawnRateMultiplier: 1.0,
+        announcementText: "All systems online.",
+      };
     }
     const rawData = fs.readFileSync(filePath, "utf-8");
     const parsed = JSON.parse(rawData || "{}");
     return Array.isArray(parsed) ? parsed[0] : parsed;
   } catch (error) {
-    return { systemMaintenanceMode: false, globalSpawnRateMultiplier: 1.0, announcementText: "All systems online." };
+    return {
+      systemMaintenanceMode: false,
+      globalSpawnRateMultiplier: 1.0,
+      announcementText: "All systems online.",
+    };
   }
 };
 
@@ -58,7 +66,11 @@ router.get("/admin", (req: Request, res: Response) => {
 
   // Hardcoded Victory Threshold: Count any run where level completion is >= 5, or difficulty was Hard, or final score matches win criteria
   const gameBeatenCount = leaderboard.filter((run: any) => {
-    return run.levelsCompleted >= 5 || run.gameCompleted === true || run.finalScore >= 500;
+    return (
+      run.levelsCompleted >= 5 ||
+      run.gameCompleted === true ||
+      run.finalScore >= 500
+    );
   }).length;
 
   // Contextual Combat & Psychological Metadata
@@ -68,9 +80,9 @@ router.get("/admin", (req: Request, res: Response) => {
   let criticalOverloadLockouts = 0;
 
   playerStats.forEach((player: any) => {
-    cumulativeEntitiesEliminated += (player.totalKills || 0);
-    cumulativeCracksSealed += (player.cracksClosed || 0);
-    runningTotalCorruption += (player.corruptionLevel || 0);
+    cumulativeEntitiesEliminated += player.totalKills || 0;
+    cumulativeCracksSealed += player.cracksClosed || 0;
+    runningTotalCorruption += player.corruptionLevel || 0;
 
     // Count how many players are in an active 100% Corruption Lockout state
     if (player.corruptionLevel >= 100) {
@@ -78,9 +90,10 @@ router.get("/admin", (req: Request, res: Response) => {
     }
   });
 
-  const averageCorruptionLevel = playerStats.length > 0 
-    ? (runningTotalCorruption / playerStats.length).toFixed(1) 
-    : "0.0";
+  const averageCorruptionLevel =
+    playerStats.length > 0
+      ? (runningTotalCorruption / playerStats.length).toFixed(1)
+      : "0.0";
 
   // Package computed data for explicit presentation inside views/admin.ejs
   const telemetry = {
@@ -91,7 +104,7 @@ router.get("/admin", (req: Request, res: Response) => {
     cumulativeCracksSealed,
     criticalOverloadLockouts,
     averageCorruptionLevel,
-    systemStatus: adminConfig
+    systemStatus: adminConfig,
   };
 
   // Render out structured template and forward dashboard parameters
@@ -99,18 +112,24 @@ router.get("/admin", (req: Request, res: Response) => {
 });
 
 // --- AI Dialogue Generation Endpoint ---
-      router.post("/chat", async (req: Request, res: Response): Promise<void> => {
-        try {
-          const playerMessage = req.body.message;
+router.post("/chat", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const playerMessage = req.body.message;
 
-          // FIX: Prevent fatal API crashes by intercepting empty/invalid inputs
-          if (!playerMessage || typeof playerMessage !== "string" || playerMessage.trim() === "") {
-              res.json({ response: "The memory entity stares blankly. It requires input." });
-              return; 
-          }
+    // FIX: Prevent fatal API crashes by intercepting empty/invalid inputs
+    if (
+      !playerMessage ||
+      typeof playerMessage !== "string" ||
+      playerMessage.trim() === ""
+    ) {
+      res.json({
+        response: "The memory entity stares blankly. It requires input.",
+      });
+      return;
+    }
 
-          const chatCompletion = await groq.chat.completions.create({
-            // ... [rest of your AI call remains the same]
+    const chatCompletion = await groq.chat.completions.create({
+      // ... [rest of your AI call remains the same]
       messages: [
         {
           role: "system",
@@ -177,7 +196,52 @@ router.post(
   async (req: Request, res: Response): Promise<void> => {
     try {
       const difficulty = req.body.difficulty || "Medium";
+      const isBossLevel = req.body.isBoss === true; // NEW: Catch the boss flag from the frontend
       const randomSeed = crypto.randomUUID();
+
+      // =================================================================
+      // NEW: BOSS ARENA INTERCEPT
+      // =================================================================
+      if (isBossLevel) {
+        console.log("[SYSTEM] Boss level requested. Bypassing AI generation.");
+
+        // Create a symmetrical 12x40 combat arena
+        const bossGrid = Array(12)
+          .fill(null)
+          .map((_, rowIndex) => {
+            // Solid floor baseline
+            if (rowIndex === 11) return Array(40).fill(1);
+
+            // Add two elevated platforms for vertical dodging (Rows 6 and 8)
+            if (rowIndex === 8) {
+              const row = Array(40).fill(0);
+              for (let i = 5; i < 12; i++) row[i] = 1; // Left platform
+              for (let i = 28; i < 35; i++) row[i] = 1; // Right platform
+              return row;
+            }
+            if (rowIndex === 5) {
+              const row = Array(40).fill(0);
+              for (let i = 15; i < 25; i++) row[i] = 1; // Center high platform
+              return row;
+            }
+            // Open air for the rest
+            return Array(40).fill(0);
+          });
+
+        // Immediately return the arena and exit the function early
+        res.json({
+          grid: bossGrid,
+          cracks: [],
+          bossTelemetry: {
+            health: 200,
+            maxHealth: 200,
+            damage: 20,
+            speed: 2,
+            abilities: ["projectile", "melee"],
+          },
+        });
+        return;
+      }
 
       // Read explicit properties matching the current level difficulty
       const config = difficultyConfig[difficulty] || difficultyConfig["Medium"];
@@ -374,7 +438,7 @@ router.post(
         //  Fixed clean line:
         let safeSpawnRate = Math.max(
           config.minSpawnRate,
-          Math.min(config.maxSpawnRate, rawSpawnRate)
+          Math.min(config.maxSpawnRate, rawSpawnRate),
         );
 
         return {

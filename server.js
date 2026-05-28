@@ -49,6 +49,27 @@ const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 // Ensure your express app can parse JSON bodies
 app.use(express.json());
 
+// --- THE FIX: Bridge JavaScript and TypeScript ---
+require("ts-node").register({
+    transpileOnly: true, // The Hammer: Skips strict TS compiler checks and just builds the code
+    skipProject: true,   // The Shield: Completely blocks ts-node from reading the nested tsconfig.json!
+    compilerOptions: {
+        target: "ES2022",
+        module: "CommonJS",
+        moduleResolution: "node",
+        esModuleInterop: true, 
+    },
+    moduleTypes: {
+        "/**/*.ts": "cjs", // Catches absolute paths 
+        "**/*.ts": "cjs"   // Keeps relative path coverage
+    }
+});
+
+// Import the TypeScript router from its actual location
+const aiRoutes = require("./artifacts/api-server/src/routes/index").default;
+
+// Mount the routes to your app
+app.use("/", aiRoutes);
 
 // Sectional Title: Root Route Handling for Home/Login Page - 2026-05-18
 app.get("/", (req, res) => {
@@ -59,7 +80,7 @@ app.get("/", (req, res) => {
             let adminData = JSON.parse(fs.readFileSync(adminPath, "utf8"));
             announcementText = adminData.announcementText || "";
         }
-    } catch(e) {}
+    } catch (e) {}
 
     res.render("index", { announcementText });
 });
@@ -81,14 +102,19 @@ app.get("/search", (req, res) => {
     // 2. If a search was executed, filter the database
     if (searchQuery) {
         try {
-            let profilesDb = JSON.parse(fs.readFileSync(profilesDbPath, "utf8"));
+            let profilesDb = JSON.parse(
+                fs.readFileSync(profilesDbPath, "utf8"),
+            );
 
             // Find all profiles where the username partially or exactly matches the query
-            results = profilesDb.filter((profile) => 
-                profile.username.toLowerCase().includes(searchQuery)
+            results = profilesDb.filter((profile) =>
+                profile.username.toLowerCase().includes(searchQuery),
             );
         } catch (err) {
-            console.error("[Search Module] Error reading profiles database:", err);
+            console.error(
+                "[Search Module] Error reading profiles database:",
+                err,
+            );
         }
     }
 
@@ -96,10 +122,10 @@ app.get("/search", (req, res) => {
     const isAdmin = req.session && req.session.isAdmin === true;
 
     // 4. Render the page with the search results and the admin authorization flag
-    res.render("search", { 
-        results: results, 
-        searchQuery: searchQuery, 
-        isAdmin: isAdmin 
+    res.render("search", {
+        results: results,
+        searchQuery: searchQuery,
+        isAdmin: isAdmin,
     });
 });
 
@@ -107,8 +133,10 @@ app.get("/search", (req, res) => {
 app.post("/admin/terminate", (req, res) => {
     // 1. Ultimate Security Guard: Verify they are actually an Admin!
     if (!req.session || !req.session.isAdmin) {
-        console.log("[Admin Security] Unauthorized termination attempt blocked.");
-        return res.redirect("/"); 
+        console.log(
+            "[Admin Security] Unauthorized termination attempt blocked.",
+        );
+        return res.redirect("/");
     }
 
     // 2. Grab the target user's ID from the hidden input in our form
@@ -120,7 +148,9 @@ app.post("/admin/terminate", (req, res) => {
     }
 
     try {
-        console.log(`[Moderation] Initiating termination protocol for User ID: ${targetUserId}`);
+        console.log(
+            `[Moderation] Initiating termination protocol for User ID: ${targetUserId}`,
+        );
 
         // 3. Read ALL relational databases
         let usersDb = JSON.parse(fs.readFileSync(usersDbPath, "utf8"));
@@ -134,10 +164,17 @@ app.post("/admin/terminate", (req, res) => {
 
         // 4. Filter out the targeted user from every single database
         // Note: users.json uses 'id', while the others use 'userId'
-        usersDb = usersDb.filter(user => user.id !== targetUserId);
-        profilesDb = profilesDb.filter(profile => profile.userId !== targetUserId);
-        gamestateDb = gamestateDb.filter(state => state.userId !== targetUserId);
-        playerDb = playerDb.filter(player => player.userId !== targetUserId && player.id !== targetUserId); 
+        usersDb = usersDb.filter((user) => user.id !== targetUserId);
+        profilesDb = profilesDb.filter(
+            (profile) => profile.userId !== targetUserId,
+        );
+        gamestateDb = gamestateDb.filter(
+            (state) => state.userId !== targetUserId,
+        );
+        playerDb = playerDb.filter(
+            (player) =>
+                player.userId !== targetUserId && player.id !== targetUserId,
+        );
 
         // 5. Save the scrubbed arrays back to the physical files
         fs.writeFileSync(usersDbPath, JSON.stringify(usersDb, null, 2));
@@ -148,9 +185,14 @@ app.post("/admin/terminate", (req, res) => {
             fs.writeFileSync(playerDbPath, JSON.stringify(playerDb, null, 2));
         }
 
-        console.log(`[Moderation] Neural Link Terminated. All records scrubbed.`);
+        console.log(
+            `[Moderation] Neural Link Terminated. All records scrubbed.`,
+        );
     } catch (error) {
-        console.error("[Moderation Error] Failed to complete data scrub:", error);
+        console.error(
+            "[Moderation Error] Failed to complete data scrub:",
+            error,
+        );
     }
 
     // 6. Redirect the admin back to the search page so they can keep working
@@ -158,86 +200,93 @@ app.post("/admin/terminate", (req, res) => {
 });
 
 // Sectional Title: Aggregated Global Leaderboard Route
-        // Sectional Title: Aggregated Global Leaderboard Route
-        app.get("/leaderboard", (req, res) => {
-            // 1. Helper to safely read files
-            const readJsonSafe = (fileName) => {
-                try {
-                    const filePath = path.join(__dirname, "data", fileName);
-                    if (fs.existsSync(filePath)) {
-                        return JSON.parse(fs.readFileSync(filePath, "utf8"));
-                    }
-                } catch (err) {
-                    console.error(`Error reading ${fileName}:`, err);
-                }
-                return [];
+// Sectional Title: Aggregated Global Leaderboard Route
+app.get("/leaderboard", (req, res) => {
+    // 1. Helper to safely read files
+    const readJsonSafe = (fileName) => {
+        try {
+            const filePath = path.join(__dirname, "data", fileName);
+            if (fs.existsSync(filePath)) {
+                return JSON.parse(fs.readFileSync(filePath, "utf8"));
+            }
+        } catch (err) {
+            console.error(`Error reading ${fileName}:`, err);
+        }
+        return [];
+    };
+
+    // 2. Load the raw run histories and player states
+    const rawRuns = readJsonSafe("leaderboard.json");
+    const playerStats = readJsonSafe("player.json");
+
+    // 3. Aggregate data per player (Not per run!)
+    const aggregatedData = {};
+
+    rawRuns.forEach((run) => {
+        const uname = run.username || "Unknown Entity";
+
+        // If this player isn't in our grouped list yet, add them with baseline stats
+        if (!aggregatedData[uname]) {
+            aggregatedData[uname] = {
+                username: uname,
+                totalRuns: 0,
+                victories: 0,
+                highestScore: 0,
+                highestLevel: 0,
+                shortestTime: Infinity,
+                lowestCorruption: 100, // Default max corruption
             };
+        }
 
-            // 2. Load the raw run histories and player states
-            const rawRuns = readJsonSafe("leaderboard.json");
-            const playerStats = readJsonSafe("player.json");
+        let p = aggregatedData[uname];
 
-            // 3. Aggregate data per player (Not per run!)
-            const aggregatedData = {};
+        // Tally totals
+        p.totalRuns++;
+        if (run.gameCompleted) p.victories++;
 
-            rawRuns.forEach((run) => {
-                const uname = run.username || "Unknown Entity";
+        // Find "Bests"
+        if (run.finalScore > p.highestScore) p.highestScore = run.finalScore;
+        if (run.levelsCompleted > p.highestLevel)
+            p.highestLevel = run.levelsCompleted;
+        if (run.totalRuntime && run.totalRuntime < p.shortestTime)
+            p.shortestTime = run.totalRuntime;
+    });
 
-                // If this player isn't in our grouped list yet, add them with baseline stats
-                if (!aggregatedData[uname]) {
-                    aggregatedData[uname] = {
-                        username: uname,
-                        totalRuns: 0,
-                        victories: 0,
-                        highestScore: 0,
-                        highestLevel: 0,
-                        shortestTime: Infinity, 
-                        lowestCorruption: 100 // Default max corruption
-                    };
-                }
+    // 4. Cross-reference player.json to grab their lowest corruption & total kills
+    playerStats.forEach((player) => {
+        const uname = player.username;
+        if (aggregatedData[uname]) {
+            // If they have a corruption level lower than our current record, update it
+            if (
+                player.corruptionLevel !== undefined &&
+                player.corruptionLevel < aggregatedData[uname].lowestCorruption
+            ) {
+                aggregatedData[uname].lowestCorruption = player.corruptionLevel;
+            }
+            aggregatedData[uname].totalKills = player.totalKills || 0;
+        }
+    });
 
-                let p = aggregatedData[uname];
+    // 5. Clean up the data array for the frontend
+    const leaderboardArray = Object.values(aggregatedData).map((p) => {
+        // If they never recorded a valid time, set it to 0 instead of Infinity
+        if (p.shortestTime === Infinity) p.shortestTime = 0;
+        return p;
+    });
 
-                // Tally totals
-                p.totalRuns++;
-                if (run.gameCompleted) p.victories++;
-
-                // Find "Bests"
-                if (run.finalScore > p.highestScore) p.highestScore = run.finalScore;
-                if (run.levelsCompleted > p.highestLevel) p.highestLevel = run.levelsCompleted;
-                if (run.totalRuntime && run.totalRuntime < p.shortestTime) p.shortestTime = run.totalRuntime;
-            });
-
-            // 4. Cross-reference player.json to grab their lowest corruption & total kills
-            playerStats.forEach((player) => {
-                const uname = player.username;
-                if (aggregatedData[uname]) {
-                    // If they have a corruption level lower than our current record, update it
-                    if (player.corruptionLevel !== undefined && player.corruptionLevel < aggregatedData[uname].lowestCorruption) {
-                        aggregatedData[uname].lowestCorruption = player.corruptionLevel;
-                    }
-                    aggregatedData[uname].totalKills = player.totalKills || 0;
-                }
-            });
-
-            // 5. Clean up the data array for the frontend
-            const leaderboardArray = Object.values(aggregatedData).map(p => {
-                // If they never recorded a valid time, set it to 0 instead of Infinity
-                if (p.shortestTime === Infinity) p.shortestTime = 0; 
-                return p;
-            });
-
-            // 6. Pass the compiled array as a JSON string to the frontend EJS
-            res.render("leaderboard", { 
-                leaderboardData: JSON.stringify(leaderboardArray) 
-            });
-        });
+    // 6. Pass the compiled array as a JSON string to the frontend EJS
+    res.render("leaderboard", {
+        leaderboardData: JSON.stringify(leaderboardArray),
+    });
+});
 // Sectional Title: Administrative Control Dashboard Routes - 2026-05-18
 app.get("/admin", (req, res) => {
     // 1. Security Check: Block access if not logged in as admin
     if (!req.session || !req.session.isAdmin) {
-        console.log("[Admin Security] Unauthorized view attempt on /admin blocked.");
-        return res.redirect("/"); 
+        console.log(
+            "[Admin Security] Unauthorized view attempt on /admin blocked.",
+        );
+        return res.redirect("/");
     }
 
     // 2. Helper to safely read flat JSON databases without crashing
@@ -259,21 +308,29 @@ app.get("/admin", (req, res) => {
     const playerStats = readJsonSafe("player.json");
 
     // Parse Admin Settings (with a safe fallback if the file doesn't exist yet)
-    let adminConfig = { systemMaintenanceMode: false, globalSpawnRateMultiplier: 1.0, announcementText: "All systems online." };
+    let adminConfig = {
+        systemMaintenanceMode: false,
+        globalSpawnRateMultiplier: 1.0,
+        announcementText: "All systems online.",
+    };
     try {
         const adminPath = path.join(__dirname, "data", "admin.json");
         if (fs.existsSync(adminPath)) {
             let parsed = JSON.parse(fs.readFileSync(adminPath, "utf8"));
             adminConfig = Array.isArray(parsed) ? parsed[0] : parsed;
         }
-    } catch(e) {}
+    } catch (e) {}
 
     // 4. Compute Dashboard Telemetry Metrics
     const totalAccounts = users.length;
     const totalRunsGlobally = leaderboard.length;
 
     const gameBeatenCount = leaderboard.filter((run) => {
-        return run.levelsCompleted >= 5 || run.gameCompleted === true || run.finalScore >= 500;
+        return (
+            run.levelsCompleted >= 5 ||
+            run.gameCompleted === true ||
+            run.finalScore >= 500
+        );
     }).length;
 
     let cumulativeEntitiesEliminated = 0;
@@ -282,16 +339,17 @@ app.get("/admin", (req, res) => {
     let criticalOverloadLockouts = 0;
 
     playerStats.forEach((player) => {
-        cumulativeEntitiesEliminated += (player.totalKills || 0);
-        cumulativeCracksSealed += (player.cracksClosed || 0);
-        runningTotalCorruption += (player.corruptionLevel || 0);
+        cumulativeEntitiesEliminated += player.totalKills || 0;
+        cumulativeCracksSealed += player.cracksClosed || 0;
+        runningTotalCorruption += player.corruptionLevel || 0;
 
         if (player.corruptionLevel >= 100) criticalOverloadLockouts++;
     });
 
-    const averageCorruptionLevel = playerStats.length > 0 
-        ? (runningTotalCorruption / playerStats.length).toFixed(1) 
-        : "0.0";
+    const averageCorruptionLevel =
+        playerStats.length > 0
+            ? (runningTotalCorruption / playerStats.length).toFixed(1)
+            : "0.0";
 
     // 5. Package the data object
     const telemetry = {
@@ -302,7 +360,7 @@ app.get("/admin", (req, res) => {
         cumulativeCracksSealed,
         criticalOverloadLockouts,
         averageCorruptionLevel,
-        systemStatus: adminConfig
+        systemStatus: adminConfig,
     };
 
     // 6. Render the view AND pass the telemetry data to it!
@@ -313,7 +371,9 @@ app.get("/admin", (req, res) => {
 app.get("/admin/update", (req, res) => {
     // Block access if the user hasn't successfully logged in as an admin
     if (!req.session || !req.session.isAdmin) {
-        console.log("[Admin Security] Unauthorized view attempt on /admin/update blocked.");
+        console.log(
+            "[Admin Security] Unauthorized view attempt on /admin/update blocked.",
+        );
         return res.redirect("/"); // Kick them back to the login screen
     }
 
@@ -334,7 +394,7 @@ app.post("/admin/update", (req, res) => {
         playerMeleeDamage: parseInt(req.body.playerMeleeDamage) || 10,
         enemyBaseHealth: parseInt(req.body.enemyBaseHealth) || 30,
         enemyDamage: parseInt(req.body.enemyDamage) || 10,
-        announcementText: req.body.announcementText || ""
+        announcementText: req.body.announcementText || "",
     };
 
     fs.writeFileSync(adminPath, JSON.stringify(newConfig, null, 2));
@@ -424,7 +484,9 @@ app.post("/auth/login", (req, res) => {
 
     // 2. INTERCEPT AND EVALUATE FOR ADMINISTRATIVE OVERRIDE
     if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
-        console.log(`[Fractured Mind] Administrative security override successful.`);
+        console.log(
+            `[Fractured Mind] Administrative security override successful.`,
+        );
         req.session.userId = "admin-root-id";
         req.session.isAdmin = true; // Inject secure permission flag into session
         return res.redirect("/admin"); // Reroute straight to dashboard
@@ -580,6 +642,7 @@ app.post("/api/generate-boss-level", async (req, res) => {
 
         res.json({
             grid: bossEncounterGrid,
+            cracks: [],
             bossTelemetry: {
                 name: `Mirror Reflection of ${username}`,
                 health: bossHealth,
@@ -597,18 +660,16 @@ app.post("/api/generate-boss-level", async (req, res) => {
         // return the baseline boss instead of breaking the game loop!
         res.json({
             grid: bossEncounterGrid,
+            cracks: [],
             bossTelemetry: {
-                name: "Corrupted Memory",
-                health: 150,
-                maxHealth: 150,
-                speed: 5,
-                damage: 15,
-                abilities: {
-                    hasExtendedRange: false,
-                    hasDashSprint: false,
-                    hasHealingCore: false,
-                },
-                copiedUpgrades: [],
+                name: `Mirror Reflection of ${username}`,
+                health: bossHealth,
+                maxHealth: bossHealth,
+                speed: bossSpeed,
+                damage: finalCalculatedDamage,
+                abilities: upgrades, // ✅ FIX: Send the string array here!
+                bossFlags: bossAbilities, // (Optional) Pass the object under a new name if you need it elsewhere
+                copiedUpgrades: upgrades,
             },
         });
     }
@@ -635,13 +696,13 @@ app.get("/game", (req, res) => {
     }
 
     // --- NEW: Fetch the live Admin Config to pass to the engine! ---
-    let adminConfig = { 
-        levelsUntilBoss: 4, 
-        playerMaxHealth: 100, 
-        playerMeleeDamage: 10, 
-        enemyBaseHealth: 30, 
+    let adminConfig = {
+        levelsUntilBoss: 4,
+        playerMaxHealth: 100,
+        playerMeleeDamage: 10,
+        enemyBaseHealth: 30,
         enemyDamage: 10,
-        announcementText: "All systems operational."
+        announcementText: "All systems operational.",
     };
 
     try {
@@ -650,14 +711,14 @@ app.get("/game", (req, res) => {
             let parsed = JSON.parse(fs.readFileSync(adminPath, "utf8"));
             adminConfig = Array.isArray(parsed) ? parsed[0] : parsed;
         }
-    } catch(e) {
+    } catch (e) {
         console.error("Error reading admin.json:", e);
     }
 
     // --- NEW: Pass BOTH the profile and the adminConfig to the EJS template ---
-    res.render("game", { 
-        profile: userProfile, 
-        adminConfig: adminConfig 
+    res.render("game", {
+        profile: userProfile,
+        adminConfig: adminConfig,
     });
 });
 

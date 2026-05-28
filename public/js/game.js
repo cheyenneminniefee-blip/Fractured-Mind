@@ -12,12 +12,15 @@ canvas.height = container.clientHeight - 4;
 // 2. Fetch data from EJS handoff
 const userProfile = window.GAME_STATE.playerProfile;
 // NEW: Load the admin parameters with safe fallbacks
-const sysConfig = window.GAME_STATE.adminConfig || {
+// NEW: Load the admin parameters with true property-level fallbacks
+const sysConfig = {
     levelsUntilBoss: 4,
     playerMaxHealth: 100,
     playerMeleeDamage: 10,
     enemyBaseHealth: 30,
     enemyDamage: 10,
+    // Overwrites the defaults above ONLY if the server provided specific properties
+    ...(window.GAME_STATE.adminConfig || {}) 
 };
 
 // Track active room loading transactions to guard against repetitive calls
@@ -124,6 +127,9 @@ let boss = null; // Holds the boss entity when spawned
 // 4. Structural Array Compilers
 const platforms = [];
 const npcs = [];
+
+const bossProjectiles = [];
+let bossMeleeHitbox = null;
 
 // Clean modular compilation routine used both on startup and dynamic transitions
 function compileStructuralBlocks() {
@@ -270,13 +276,15 @@ function updatePhysics() {
     }
 
     // X-Axis Movement & Collision Resolution
+    // X-Axis Movement & Collision Resolution
     player.x += player.velocityX;
     platforms.forEach((platform) => {
+        // THE FIX: Added a 1-pixel buffer (+ 1 and - 1) to the Y-axis checks
         if (
             player.x < platform.x + platform.width &&
             player.x + player.width > platform.x &&
-            player.y < platform.y + platform.height &&
-            player.y + player.height > platform.y
+            player.y < platform.y + platform.height - 1 &&
+            player.y + player.height > platform.y + 1
         ) {
             if (player.velocityX > 0) {
                 player.x = platform.x - player.width;
@@ -301,9 +309,10 @@ function updatePhysics() {
     player.isGrounded = false;
 
     platforms.forEach((platform) => {
+        // THE FIX: Added a 1-pixel buffer (+ 1 and - 1) to the X-axis checks
         if (
-            player.x < platform.x + platform.width &&
-            player.x + player.width > platform.x &&
+            player.x < platform.x + platform.width - 1 &&
+            player.x + player.width > platform.x + 1 &&
             player.y < platform.y + platform.height &&
             player.y + player.height > platform.y
         ) {
@@ -331,8 +340,8 @@ function updatePhysics() {
         camera.x = levelWidth - canvas.width;
 
     // 3. AI-Procedural Room Transition: Hitting the Right Edge
-    // 3. AI-Procedural Room Transition: Hitting the Right Edge
-    if (player.x + player.width >= levelWidth && !isTransitioning) {
+    // THE FIX: Added '!boss' to lock the player in the arena until the boss dies
+    if (player.x + player.width >= levelWidth && !isTransitioning && !boss) {
         isTransitioning = true;
         player.velocityX = 0;
         player.velocityY = 0;
@@ -340,13 +349,13 @@ function updatePhysics() {
         // Advance room progression tracking counter
         levelCount++;
 
-        // Shift route to Mirror Boss encounter logic once player hits the 4th room threshold
-        let endpoint =
-            levelCount >= sysConfig.levelsUntilBoss
-                ? "/api/generate-boss-level"
-                : "/api/generate-level";
+        let endpoint = "/api/generate-level";
+
+        // 2. Determine if it's time for the boss
+        let timeForBoss = levelCount >= sysConfig.levelsUntilBoss;
+
         console.log(
-            `[Fractured Mind] Compiling dynamic matrix grid via AI... Loading Room ${levelCount}. Route: ${endpoint}`,
+            `[Fractured Mind] Compiling dynamic matrix grid via AI... Loading Room ${levelCount}. Boss Mode: ${timeForBoss}`,
         );
 
         // Clean out active actor instances and parameters from the previous level matrix
@@ -356,10 +365,14 @@ function updatePhysics() {
         upgradesOnMap.length = 0; // Reset loose drops on previous screen
 
         // Execute unified endpoint handshake payload extraction
+        // Execute unified endpoint handshake payload extraction
         fetch(endpoint, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ difficulty: "Medium" }),
+            body: JSON.stringify({
+                difficulty: "Medium",
+                isBoss: timeForBoss, // <-- Pass the flag to the backend!
+            }),
         })
             .then((response) => response.json())
             .then((aiData) => {
@@ -384,23 +397,32 @@ function updatePhysics() {
                 compileStructuralBlocks();
 
                 // --- BRANCH A: PROCESS BOSS TELEMETRY ENCOUNTER ---
+                // --- BRANCH A: PROCESS BOSS TELEMETRY ENCOUNTER ---
                 if (aiData.bossTelemetry) {
+                    const corruptionScale = 1 + player.corruptionLevel / 100;
+
                     boss = {
-                        x: tileWidth * 20, // Instantiate reflection exactly in center court of room
+                        // Change from 20 to 15 so they spawn dynamically inside the viewport
+                        x: tileWidth * 15,
                         y: tileHeight * 5,
                         width: 30 * scaleX,
                         height: 30 * scaleY,
-                        hp: aiData.bossTelemetry.health,
-                        maxHp: aiData.bossTelemetry.maxHealth,
+
+                        // Scale Health and Damage based on Corruption
+                        hp: aiData.bossTelemetry.health * corruptionScale,
+                        maxHp: aiData.bossTelemetry.maxHealth * corruptionScale,
+                        damage: aiData.bossTelemetry.damage * corruptionScale,
+
                         speed: aiData.bossTelemetry.speed * scaleX,
-                        damage: aiData.bossTelemetry.damage,
                         abilities: aiData.bossTelemetry.abilities,
-                        color: "#ff0000", // Crimson threat profile indicator mapping
+                        color: "#ff0000",
                         velocityX: 0,
                         velocityY: 0,
                         isGrounded: false,
-                        attackCooldown: 0,
+                        attackCooldown: 60,
+                        facingRight: false,
                     };
+
                     console.log(
                         "[Fractured Mind] WARNING: Mirror Boss entity initialized.",
                         aiData.bossTelemetry,
@@ -602,6 +624,131 @@ function updateCombat() {
             p.y > canvas.height
         ) {
             projectiles.splice(i, 1);
+        }
+    }
+
+    // ==========================================
+    // BOSS COMBAT PROCESSING & COLLISIONS
+    // ==========================================
+    if (boss) {
+        // --- 1. Player Attacks Hitting Boss ---
+        for (let i = projectiles.length - 1; i >= 0; i--) {
+            let p = projectiles[i];
+            if (
+                p.x < boss.x + boss.width &&
+                p.x + p.width > boss.x &&
+                p.y < boss.y + boss.height &&
+                p.y + p.height > boss.y
+            ) {
+                boss.hp -= 12;
+                projectiles.splice(i, 1);
+
+                // BOSS DEATH CHECK
+                if (boss.hp <= 0) {
+                    alert(
+                        "THE MIRROR SHATTERS. Dynamic loop terminated. Mind Restored.",
+                    );
+                    boss = null;
+                    window.location.href = "/";
+                    return; // Exit out of the combat loop entirely
+                }
+            }
+        }
+
+        if (activeMeleeHitbox) {
+            if (
+                activeMeleeHitbox.x < boss.x + boss.width &&
+                activeMeleeHitbox.x + activeMeleeHitbox.width > boss.x &&
+                activeMeleeHitbox.y < boss.y + boss.height &&
+                activeMeleeHitbox.y + activeMeleeHitbox.height > boss.y
+            ) {
+                if (!activeMeleeHitbox.hitEntities.includes("boss")) {
+                    boss.hp -= 25;
+                    activeMeleeHitbox.hitEntities.push("boss");
+
+                    // BOSS DEATH CHECK
+                    if (boss.hp <= 0) {
+                        alert(
+                            "THE MIRROR SHATTERS. Dynamic loop terminated. Mind Restored.",
+                        );
+                        boss = null;
+                        window.location.href = "/";
+                        return; // Exit out of the combat loop entirely
+                    }
+                }
+            }
+        }
+
+        // --- 2. Boss Attacks Hitting Player ---
+        for (let i = bossProjectiles.length - 1; i >= 0; i--) {
+            let bp = bossProjectiles[i];
+            bp.x += bp.velocityX;
+            bp.y += bp.velocityY;
+
+            if (
+                bp.x < player.x + player.width &&
+                bp.x + bp.width > player.x &&
+                bp.y < player.y + player.height &&
+                bp.y + bp.height > player.y
+            ) {
+                player.currentHealth -= bp.damage; // FIXED VARIABLE
+                bossProjectiles.splice(i, 1);
+
+                // PLAYER DEATH CHECK
+                if (player.currentHealth <= 0) {
+                    alert(
+                        "SYSTEM FAILURE: Vital signs lost. Memory fragmented.",
+                    );
+                    player.x = tileWidth * 3;
+                    player.y = canvas.height - tileHeight * 2;
+                    camera.x = 0;
+                    player.currentHealth = player.maxHealth;
+                    player.corruptionLevel = 0;
+                }
+                continue;
+            }
+
+            if (
+                bp.x < camera.x ||
+                bp.x > camera.x + canvas.width ||
+                bp.y < 0 ||
+                bp.y > canvas.height
+            ) {
+                bossProjectiles.splice(i, 1);
+            }
+        }
+
+        if (bossMeleeHitbox) {
+            bossMeleeHitbox.duration--;
+            bossMeleeHitbox.x = boss.facingRight
+                ? boss.x + boss.width
+                : boss.x - bossMeleeHitbox.width;
+            bossMeleeHitbox.y = boss.y - 10 * scaleY;
+
+            if (
+                bossMeleeHitbox.x < player.x + player.width &&
+                bossMeleeHitbox.x + bossMeleeHitbox.width > player.x &&
+                bossMeleeHitbox.y < player.y + player.height &&
+                bossMeleeHitbox.y + bossMeleeHitbox.height > player.y
+            ) {
+                if (!player.invincibilityTimer) {
+                    player.currentHealth -= bossMeleeHitbox.damage; // FIXED VARIABLE
+                    player.invincibilityTimer = 30;
+
+                    // PLAYER DEATH CHECK
+                    if (player.currentHealth <= 0) {
+                        alert(
+                            "SYSTEM FAILURE: Vital signs lost. Memory fragmented.",
+                        );
+                        player.x = tileWidth * 3;
+                        player.y = canvas.height - tileHeight * 2;
+                        camera.x = 0;
+                        player.currentHealth = player.maxHealth;
+                        player.corruptionLevel = 0;
+                    }
+                }
+            }
+            if (bossMeleeHitbox.duration <= 0) bossMeleeHitbox = null;
         }
     }
 
@@ -838,43 +985,94 @@ function updateUpgrades() {
     }
 }
 
+function triggerBossRanged(dx, dy) {
+    let startX = boss.x + boss.width / 2;
+    let startY = boss.y + boss.height / 2;
+    let angle = Math.atan2(dy, dx);
+    let projectileSpeed = 10 * scaleX; // Slightly slower than player's lasers
+
+    bossProjectiles.push({
+        x: startX,
+        y: startY,
+        width: 15 * scaleX,
+        height: 15 * scaleX,
+        velocityX: Math.cos(angle) * projectileSpeed,
+        velocityY: Math.sin(angle) * projectileSpeed,
+        damage: boss.damage, // Scaled via corruption
+    });
+}
+
+function triggerBossMelee() {
+    let hW = 40 * scaleX;
+    let hH = boss.height + 20 * scaleY;
+    let hX = boss.facingRight ? boss.x + boss.width : boss.x - hW;
+    let hY = boss.y - 10 * scaleY;
+
+    bossMeleeHitbox = {
+        x: hX,
+        y: hY,
+        width: hW,
+        height: hH,
+        duration: 15,
+        damage: boss.damage * 1.5, // Swords hurt more than lasers
+    };
+}
+
 function updateBossAI() {
-    if (!boss) return; // Exit loop processing routine if entity is clear
+    if (!boss) return;
 
-    // Apply baseline environmental gravity velocity vector to boss entity
-    boss.velocityY += player.gravity;
+    boss.velocityY += 0.5 * scaleY;
 
-    // Rudimentary absolute tracking pathfinding computation layout
+    // Rudimentary absolute tracking pathfinding
     let dx = player.x + player.width / 2 - (boss.x + boss.width / 2);
+    let dy = player.y + player.height / 2 - (boss.y + boss.height / 2);
+
     boss.velocityX = dx > 0 ? boss.speed : -boss.speed;
+    boss.facingRight = dx > 0; // Track facing direction for sword
 
-    // --- WEAPONIZED COPY ABILITY A: SPEED THRUSTERS/DASH SPRINT ---
-    if (boss.abilities.hasDashSprint && Math.abs(dx) > 250 * scaleX) {
-        boss.velocityX *= 2.2; // Accelerate traversal boundaries instantly
+    const abilities = boss.abilities || [];
+
+    // --- WEAPONIZED COPY ABILITY A: SPEED THRUSTERS ---
+    if (abilities.includes("Speed Thrusters") && Math.abs(dx) > 250 * scaleX) {
+        boss.velocityX *= 2.2;
     }
 
-    // --- WEAPONIZED COPY ABILITY B: QUANTUM CORE/HEALING SYSTEM ---
-    if (boss.abilities.hasHealingCore && boss.hp < boss.maxHp) {
-        boss.hp += 0.04; // Run steady incremental health regeneration state
+    // --- WEAPONIZED COPY ABILITY B: QUANTUM CORE ---
+    if (abilities.includes("Quantum Core") && boss.hp < boss.maxHp) {
+        boss.hp += 0.04;
     }
 
-    // Process horizontal translations and bounding limits
+    // X-Axis Movement & Collision
     boss.x += boss.velocityX;
+    platforms.forEach((platform) => {
+        if (
+            boss.x < platform.x + platform.width &&
+            boss.x + boss.width > platform.x &&
+            boss.y < platform.y + platform.height - 1 &&
+            boss.y + boss.height > platform.y + 1
+        ) {
+            if (boss.velocityX > 0) {
+                boss.x = platform.x - boss.width;
+            } else if (boss.velocityX < 0) {
+                boss.x = platform.x + platform.width;
+            }
+        }
+    });
+
     if (boss.x < 0) boss.x = 0;
     if (boss.x + boss.width > levelWidth) boss.x = levelWidth - boss.width;
 
-    // Process vertical translations and static platform matrix intersections
+    // Y-Axis Movement & Collision (The part that got cut off!)
     boss.y += boss.velocityY;
     boss.isGrounded = false;
 
     platforms.forEach((platform) => {
         if (
-            boss.x < platform.x + platform.width &&
-            boss.x + boss.width > platform.x &&
+            boss.x < platform.x + platform.width - 1 &&
+            boss.x + boss.width > platform.x + 1 &&
             boss.y < platform.y + platform.height &&
             boss.y + boss.height > platform.y
         ) {
-            // FIX: Added bidirectional Y-axis collision
             if (boss.velocityY > 0) {
                 boss.y = platform.y - boss.height;
                 boss.velocityY = 0;
@@ -886,48 +1084,23 @@ function updateBossAI() {
         }
     });
 
-    // Mirror jump command patterns if player tracks to an elevated tile platform height
-    if (boss.isGrounded && player.y < boss.y - 40 * scaleY) {
-        boss.velocityY = player.jumpStrength * 1.05;
-    }
-
-    // Process internal weapon attack execution cooldown states
+    // ==========================================
+    // BOSS ATTACK STATE MACHINE
+    // ==========================================
     if (boss.attackCooldown > 0) boss.attackCooldown--;
 
-    // --- WEAPONIZED COPY ABILITY C: PRISMATIC EDGE RANGE MULTIPLIER ---
-    let threatRange = boss.abilities.hasExtendedRange
-        ? 110 * scaleX
-        : 55 * scaleX;
+    if (boss.attackCooldown <= 0) {
+        let distanceToPlayer = Math.sqrt(dx * dx + dy * dy);
 
-    if (
-        boss.attackCooldown === 0 &&
-        Math.abs(dx) < threatRange &&
-        Math.abs(player.y - boss.y) < 80 * scaleY
-    ) {
-        if (player.invincibilityTimer === 0) {
-            player.currentHealth -= boss.damage;
-            // FIX: Added corruption spike on boss hit
-            player.corruptionLevel = Math.min(100, player.corruptionLevel + 25);
-            player.invincibilityTimer = 60;
-
-            // Apply knockback vectors to the player
-            player.velocityY = -6 * scaleY;
-            player.velocityX = player.x < boss.x ? -10 * scaleX : 10 * scaleX;
-
-            boss.attackCooldown = 90; // Provide 1.5 seconds recovery time before boss swings again
-
-            // FIX: Added the vital signs death check
-            if (player.currentHealth <= 0) {
-                alert(
-                    "SYSTEM FAILURE: Overwhelmed by the Mirror. Memory fragmented.",
-                );
-                player.x = tileWidth * 3;
-                player.y = canvas.height - tileHeight * 2;
-                camera.x = 0;
-                player.currentHealth = player.maxHealth;
-                player.corruptionLevel = 0;
-                boss.hp = boss.maxHp; // Punish the player by fully healing the boss on death
-            }
+        // MELEE RANGE
+        if (distanceToPlayer < 80 * scaleX) {
+            triggerBossMelee();
+            boss.attackCooldown = 50; // Delay before next attack
+        }
+        // RANGED RANGE (Only shoot if reasonably close and not right on top of player)
+        else if (distanceToPlayer < 400 * scaleX) {
+            triggerBossRanged(dx, dy);
+            boss.attackCooldown = 80; // Lasers take longer to recharge
         }
     }
 }
@@ -1026,11 +1199,12 @@ function renderGraphics() {
         ctx.fill();
     });
 
-    // Draw Mirror Boss
+    // Draw Mirror Boss (INSIDE renderGraphics)
     if (boss) {
+        const abilities = boss.abilities || [];
+
         // --- VISUAL TELEGRAPH: DASH SPRINT ---
-        // Change the shadow to a hot blue if the boss is in a speed-boosted state
-        if (boss.abilities && boss.abilities.hasDashSprint) {
+        if (abilities.includes("Speed Thrusters")) {
             ctx.shadowBlur = 30;
             ctx.shadowColor = "#00ffff";
         } else {
@@ -1041,7 +1215,7 @@ function renderGraphics() {
         ctx.fillStyle = boss.color;
         ctx.fillRect(boss.x, boss.y, boss.width, boss.height);
 
-        // Boss Health Bar
+        // Boss Health Bar (Fixed to prevent negative widths)
         ctx.shadowBlur = 0;
         ctx.fillStyle = "#222222";
         ctx.fillRect(boss.x - 10, boss.y - 20, boss.width + 20, 10);
@@ -1049,17 +1223,12 @@ function renderGraphics() {
         ctx.fillRect(
             boss.x - 10,
             boss.y - 20,
-            (boss.width + 20) * (boss.hp / boss.maxHp),
+            (boss.width + 20) * Math.max(0, boss.hp / boss.maxHp),
             10,
         );
 
         // --- VISUAL TELEGRAPH: HEALING CORE ---
-        // Draw a restorative green aura if the boss is actively healing
-        if (
-            boss.abilities &&
-            boss.abilities.hasHealingCore &&
-            boss.hp < boss.maxHp
-        ) {
+        if (abilities.includes("Quantum Core") && boss.hp < boss.maxHp) {
             ctx.strokeStyle = "rgba(0, 255, 100, 0.6)";
             ctx.lineWidth = 3;
             ctx.strokeRect(
@@ -1071,7 +1240,7 @@ function renderGraphics() {
         }
 
         // --- VISUAL TELEGRAPH: PRISMATIC EDGE ---
-        if (boss.abilities && boss.abilities.hasExtendedRange) {
+        if (boss.abilities && boss.abilities.includes("Prismatic Edge")) {
             ctx.strokeStyle = "rgba(255, 0, 0, 0.4)";
             ctx.lineWidth = 2;
             ctx.strokeRect(
@@ -1166,6 +1335,29 @@ function renderGraphics() {
     ctx.fillRect(player.x, player.y, player.width, player.height);
 
     ctx.restore();
+
+    // ADD THIS TO THE BOTTOM: Draw Boss Projectiles
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = "#ff0000"; // Red for boss lasers
+    ctx.fillStyle = "#ffffff";
+    if (typeof bossProjectiles !== "undefined") {
+        bossProjectiles.forEach((p) =>
+            ctx.fillRect(p.x, p.y, p.width, p.height),
+        );
+    }
+
+    // ADD THIS TO THE BOTTOM: Draw Boss Melee Arc
+    if (typeof bossMeleeHitbox !== "undefined" && bossMeleeHitbox) {
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = "#ff0000";
+        ctx.fillStyle = "rgba(255, 0, 0, 0.5)";
+        ctx.fillRect(
+            bossMeleeHitbox.x,
+            bossMeleeHitbox.y,
+            bossMeleeHitbox.width,
+            bossMeleeHitbox.height,
+        );
+    }
 
     // UI Overlays (Health Bar)
     ctx.shadowBlur = 0;
