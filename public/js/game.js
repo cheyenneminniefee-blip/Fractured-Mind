@@ -671,7 +671,7 @@ function updateCombat() {
                         "victory",
                         () => {
                             // Save data and go to main menu
-                            syncDataAndRedirect("/");
+                            syncDataAndRedirect("/", true);
                         },
                     );
                     return;
@@ -702,7 +702,7 @@ function updateCombat() {
                             "victory",
                             () => {
                                 // Save data and go to main menu
-                                syncDataAndRedirect("/");
+                                syncDataAndRedirect("/", true);
                             },
                         );
                         return;
@@ -946,7 +946,7 @@ function updateGhosts() {
                             "victory",
                             () => {
                                 // Save data and go to main menu
-                                syncDataAndRedirect("/");
+                                syncDataAndRedirect("/", true);
                             },
                         );
                         return;
@@ -979,7 +979,7 @@ function updateGhosts() {
                         "victory",
                         () => {
                             // Save data and go to main menu
-                            syncDataAndRedirect("/");
+                            syncDataAndRedirect("/", true);
                         },
                     );
                     return;
@@ -1655,7 +1655,7 @@ function gameLoop() {
 }
 
 // Add this function to handle saving player data and redirecting
-async function syncDataAndRedirect() {
+async function syncDataAndRedirect(redirectPath = "/", bossDefeated = false) {
     try {
         // 1. Prepare the player data to save
         const playerData = {
@@ -1668,6 +1668,7 @@ async function syncDataAndRedirect() {
             totalKills: 0, // Track total enemies killed
             cracksClosed: 0, // Track total cracks sealed
             levelsCompleted: levelCount,
+            bossDefeated: bossDefeated,
         };
 
         // 2. Send the data to the server

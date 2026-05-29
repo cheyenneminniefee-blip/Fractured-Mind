@@ -601,6 +601,23 @@ app.post("/save-player", (req, res) => {
         // 3. Save back to the file
         fs.writeFileSync(playerDbPath, JSON.stringify(playerDb, null, 2));
 
+        // 4. Append a leaderboard entry for this run
+        const leaderboardPath = path.join(__dirname, "data", "leaderboard.json");
+        let leaderboardDb = [];
+        if (fs.existsSync(leaderboardPath)) {
+            const raw = fs.readFileSync(leaderboardPath, "utf8");
+            leaderboardDb = raw ? JSON.parse(raw) : [];
+        }
+        leaderboardDb.push({
+            runId: crypto.randomUUID(),
+            userId: req.session.userId,
+            username: playerData.username || "Unknown Entity",
+            levelsCompleted: playerData.levelsCompleted || 0,
+            bossDefeated: playerData.bossDefeated || false,
+            timestamp: new Date().toISOString(),
+        });
+        fs.writeFileSync(leaderboardPath, JSON.stringify(leaderboardDb, null, 2));
+
         res.json({ message: "Player data saved successfully." });
     } catch (error) {
         console.error("Error saving player data:", error);
