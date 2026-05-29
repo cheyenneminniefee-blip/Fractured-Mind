@@ -263,6 +263,12 @@ window.addEventListener("keyup", (e) => {
 
 // 7. Mathematical Engine Physics & Tilemap Collisions
 function updatePhysics() {
+    // Passive Corruption Increase
+    // Increase by 0.01 per frame, clamping at a maximum of 100.
+    if (!isVictoryTriggered && !player.isLockedOut) {
+        player.corruptionLevel = Math.min(100, player.corruptionLevel + 0.01);
+    }
+
     // 1. Tick down Cooldowns & Manage Dash State
     if (player.dashCooldown > 0) player.dashCooldown--;
 
@@ -400,117 +406,142 @@ function updatePhysics() {
     if (camera.x > levelWidth - canvas.width)
         camera.x = levelWidth - canvas.width;
 
-    // AI-Procedural Room Transition
-    if (player.x + player.width >= levelWidth && !isTransitioning && !boss) {
-        // ... (Keep your room transition fetch logic exactly as it was written) ...
-        isTransitioning = true;
-        player.velocityX = 0;
-        player.velocityY = 0;
-        levelCount++;
-        let endpoint = "/api/generate-level";
-        let timeForBoss = levelCount >= sysConfig.levelsUntilBoss;
-        ghosts.length = 0;
-        projectiles.length = 0;
-        cracks.length = 0;
-        upgradesOnMap.length = 0;
+    // AI-Procedural Room Transition & Progression Lock
+    if (player.x + player.width >= levelWidth && !boss) {
+        // NEW: Check if every crack in the current room is sealed
+        const allCracksSealed = cracks.every((crack) => crack.isSealed);
 
-        fetch(endpoint, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ difficulty: "Medium", isBoss: timeForBoss }),
-        })
-            .then((response) => response.json())
-            .then((aiData) => {
-                if (aiData.error) {
-                    alert("System anomaly detected: " + aiData.error);
-                    window.location.href = "/";
-                    return;
-                }
-                if (aiData.grid && Array.isArray(aiData.grid)) {
-                    levelGrid = aiData.grid;
-                    gridRows = levelGrid.length;
-                    gridCols = levelGrid[0].length;
-                    tileWidth = canvas.width / viewportCols;
-                    tileHeight = canvas.height / gridRows;
-                    levelWidth = gridCols * tileWidth;
-                    levelHeight = gridRows * tileHeight;
-                }
-                compileStructuralBlocks();
-                if (aiData.bossTelemetry) {
-                    const corruptionScale = 1 + player.corruptionLevel / 100;
-                    boss = {
-                        x: tileWidth * 15,
-                        y: tileHeight * 5,
-                        width: 30 * scaleX,
-                        height: 30 * scaleY,
-                        hp: 500 + aiData.bossTelemetry.health * corruptionScale,
-                        maxHp:
-                            500 +
-                            aiData.bossTelemetry.maxHealth * corruptionScale,
-                        damage:
-                            5 + aiData.bossTelemetry.damage * corruptionScale,
-                        speed: aiData.bossTelemetry.speed * scaleX,
-                        abilities: aiData.bossTelemetry.abilities,
-                        color: "#ff0000",
-                        velocityX: 0,
-                        velocityY: 0,
-                        isGrounded: false,
-                        attackCooldown: 60,
-                        facingRight: false,
-                        isAttacking: false,
-                    };
-                } else {
-                    if (aiData.cracks && Array.isArray(aiData.cracks)) {
-                        aiData.cracks.forEach((aiCrack) => {
-                            let rawRate =
-                                aiCrack.spawnRate || aiCrack.spawn_rate || 180;
-                            cracks.push({
-                                x: aiCrack.x,
-                                y: aiCrack.y,
-                                width: 60 * scaleX,
-                                height: 80 * scaleY,
-                                color: "#ff00ff",
-                                spawnTimer: 0,
-                                spawnRate: Math.max(90, parseInt(rawRate)),
-                                isSealed: false,
-                                sealProgress: 0,
-                                sealMax: 120,
-                            });
-                        });
-                    }
-                    if (Math.random() > 0.7) {
-                        const types = [
-                            "Prismatic Edge",
-                            "Speed Thrusters",
-                            "Quantum Core",
-                        ];
-                        upgradesOnMap.push({
-                            x: tileWidth * 15,
-                            y: tileHeight * 8,
-                            width: 20 * scaleX,
-                            height: 20 * scaleY,
-                            type: types[
-                                Math.floor(Math.random() * types.length)
-                            ],
-                            color: "#00ffcc",
-                        });
-                    }
-                }
-                player.x = tileWidth * 3;
-                player.y = canvas.height - tileHeight * 2;
-                camera.x = 0;
-                isTransitioning = false;
+        if (!allCracksSealed) {
+            // Treat the right side of the level as a solid wall
+            player.x = levelWidth - player.width;
+            player.velocityX = 0;
+            if (player.isDashing) player.isDashing = false;
+            if (!player.isGrounded) player.isTouchingRightWall = true;
+        }
+        // If all cracks are sealed and we aren't already loading the next room, proceed
+        else if (!isTransitioning) {
+            isTransitioning = true;
+            player.velocityX = 0;
+            player.velocityY = 0;
+            levelCount++;
+
+            let endpoint = "/api/generate-level";
+            let timeForBoss = levelCount >= sysConfig.levelsUntilBoss;
+
+            ghosts.length = 0;
+            projectiles.length = 0;
+            cracks.length = 0;
+            upgradesOnMap.length = 0;
+
+            fetch(endpoint, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    difficulty: "Medium",
+                    isBoss: timeForBoss,
+                }),
             })
-            .catch((err) => {
-                console.error("Procedural matrix load failed.", err);
-                player.x = tileWidth * 3;
-                player.y = canvas.height - tileHeight * 2;
-                camera.x = 0;
-                isTransitioning = false;
-            });
+                .then((response) => response.json())
+                .then((aiData) => {
+                    if (aiData.error) {
+                        alert("System anomaly detected: " + aiData.error);
+                        window.location.href = "/";
+                        return;
+                    }
+                    if (aiData.grid && Array.isArray(aiData.grid)) {
+                        levelGrid = aiData.grid;
+                        gridRows = levelGrid.length;
+                        gridCols = levelGrid[0].length;
+                        tileWidth = canvas.width / viewportCols;
+                        tileHeight = canvas.height / gridRows;
+                        levelWidth = gridCols * tileWidth;
+                        levelHeight = gridRows * tileHeight;
+                    }
+
+                    compileStructuralBlocks();
+
+                    if (aiData.bossTelemetry) {
+                        const corruptionScale =
+                            1 + player.corruptionLevel / 100;
+                        boss = {
+                            x: tileWidth * 15,
+                            y: tileHeight * 5,
+                            width: 30 * scaleX,
+                            height: 30 * scaleY,
+                            hp:
+                                500 +
+                                aiData.bossTelemetry.health * corruptionScale,
+                            maxHp:
+                                500 +
+                                aiData.bossTelemetry.maxHealth *
+                                    corruptionScale,
+                            damage:
+                                5 +
+                                aiData.bossTelemetry.damage * corruptionScale,
+                            speed: aiData.bossTelemetry.speed * scaleX,
+                            abilities: aiData.bossTelemetry.abilities,
+                            color: "#ff0000",
+                            velocityX: 0,
+                            velocityY: 0,
+                            isGrounded: false,
+                            attackCooldown: 60,
+                            facingRight: false,
+                            isAttacking: false,
+                        };
+                    } else {
+                        if (aiData.cracks && Array.isArray(aiData.cracks)) {
+                            aiData.cracks.forEach((aiCrack) => {
+                                let rawRate =
+                                    aiCrack.spawnRate ||
+                                    aiCrack.spawn_rate ||
+                                    180;
+                                cracks.push({
+                                    x: aiCrack.x,
+                                    y: aiCrack.y,
+                                    width: 60 * scaleX,
+                                    height: 80 * scaleY,
+                                    color: "#ff00ff",
+                                    spawnTimer: 0,
+                                    spawnRate: Math.max(90, parseInt(rawRate)),
+                                    isSealed: false,
+                                    sealProgress: 0,
+                                    sealMax: 120,
+                                });
+                            });
+                        }
+                        if (Math.random() > 0.7) {
+                            const types = [
+                                "Prismatic Edge",
+                                "Speed Thrusters",
+                                "Quantum Core",
+                            ];
+                            upgradesOnMap.push({
+                                x: tileWidth * 15,
+                                y: tileHeight * 8,
+                                width: 20 * scaleX,
+                                height: 20 * scaleY,
+                                type: types[
+                                    Math.floor(Math.random() * types.length)
+                                ],
+                                color: "#00ffcc",
+                            });
+                        }
+                    }
+                    player.x = tileWidth * 3;
+                    player.y = canvas.height - tileHeight * 2;
+                    camera.x = 0;
+                    isTransitioning = false;
+                })
+                .catch((err) => {
+                    console.error("Procedural matrix load failed.", err);
+                    player.x = tileWidth * 3;
+                    player.y = canvas.height - tileHeight * 2;
+                    camera.x = 0;
+                    isTransitioning = false;
+                });
+        }
     }
 }
-
 // Sectional Title: Milestone 7 - Combat & AI Physics - 2026-05-19
 
 function updateCombat() {
@@ -911,6 +942,9 @@ function updateGhosts() {
             sessionKills++;
             ghosts.splice(i, 1);
             player.corruptionLevel = Math.max(0, player.corruptionLevel - 5);
+
+            player.hp = Math.min(player.maxHp, player.hp + 15);
+            // ============================
         }
     }
 
@@ -1681,7 +1715,9 @@ async function syncDataAndRedirect(redirectPath = "/", bossDefeated = false) {
         });
 
         if (!response.ok) {
-            throw new Error(`Failed to save player data: ${response.statusText}`);
+            throw new Error(
+                `Failed to save player data: ${response.statusText}`,
+            );
         }
 
         const result = await response.json();

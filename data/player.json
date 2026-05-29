@@ -4,11 +4,12 @@
     "username": "clm",
     "currentHealth": 0,
     "maxHealth": 100,
-    "corruptionLevel": 100,
+    "corruptionLevel": 99.97000000000232,
     "weaponUpgrades": [],
     "totalKills": 0,
     "cracksClosed": 0,
-    "levelsCompleted": 1,
-    "lastUpdated": "2026-05-29T00:31:16.779Z"
+    "levelsCompleted": 2,
+    "lastUpdated": "2026-05-29T00:46:20.741Z",
+    "bossDefeated": false
   }
 ]

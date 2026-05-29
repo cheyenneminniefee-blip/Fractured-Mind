@@ -1,4 +1,26 @@
 [
-  { "username": "playerOne", "levelsCompleted": 6, "finalScore": 620, "gameCompleted": true },
-  { "username": "playerTwo", "levelsCompleted": 2, "finalScore": 150, "gameCompleted": false }
+  {
+    "runId": "e82047a4-7496-4699-8dbc-ae7348007c00",
+    "userId": "c8c291af-9008-498e-9711-7437a59ec3cf",
+    "username": "clm",
+    "levelsCompleted": 1,
+    "bossDefeated": false,
+    "timestamp": "2026-05-29T00:35:26.728Z"
+  },
+  {
+    "runId": "54cc86a8-5c78-4f02-ba4d-c27565a042af",
+    "userId": "c8c291af-9008-498e-9711-7437a59ec3cf",
+    "username": "clm",
+    "levelsCompleted": 3,
+    "bossDefeated": false,
+    "timestamp": "2026-05-29T00:39:18.739Z"
+  },
+  {
+    "runId": "67a5975c-a55a-4a92-8bee-dee41a6d66c6",
+    "userId": "c8c291af-9008-498e-9711-7437a59ec3cf",
+    "username": "clm",
+    "levelsCompleted": 2,
+    "bossDefeated": false,
+    "timestamp": "2026-05-29T00:46:20.742Z"
+  }
 ]
