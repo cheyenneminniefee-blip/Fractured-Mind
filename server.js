@@ -560,8 +560,158 @@ app.post("/api/collect-upgrade", (req, res) => {
     }
 });
 
-// --- MILESTONE 11: Mirror Boss Logic & End-Game Encounter Matrix ---
-// --- MILESTONE 11: Mirror Boss Logic & End-Game Encounter Matrix ---
+// Add this to server.js
+app.post("/save-player", (req, res) => {
+    try {
+        if (!req.session.userId) {
+            return res.status(401).json({ error: "Unauthorized: No session found." });
+        }
+
+        const playerData = req.body;
+        const playerDbPath = path.join(__dirname, "data", "player.json");
+
+        // 1. Read existing player data
+        let playerDb = [];
+        if (fs.existsSync(playerDbPath)) {
+            const data = fs.readFileSync(playerDbPath, "utf8");
+            playerDb = data ? JSON.parse(data) : [];
+        }
+
+        // 2. Find or create the player's entry
+        const existingPlayerIndex = playerDb.findIndex(
+            (p) => p.userId === req.session.userId
+        );
+
+        if (existingPlayerIndex >= 0) {
+            // Update existing player data
+            playerDb[existingPlayerIndex] = {
+                ...playerDb[existingPlayerIndex],
+                ...playerData,
+                lastUpdated: new Date().toISOString(),
+            };
+        } else {
+            // Add new player data
+            playerDb.push({
+                ...playerData,
+                userId: req.session.userId,
+                lastUpdated: new Date().toISOString(),
+            });
+        }
+
+        // 3. Save back to the file
+        fs.writeFileSync(playerDbPath, JSON.stringify(playerDb, null, 2));
+
+        res.json({ message: "Player data saved successfully." });
+    } catch (error) {
+        console.error("Error saving player data:", error);
+        res.status(500).json({ error: "Failed to save player data." });
+    }
+});
+
+// --- END-GAME TELEMETRY: Save Player Run & Aggregate Stats ---
+app.post("/api/save-run", (req, res) => {
+    // 1. Ultimate Security Guard: Verify an active session
+    if (!req.session || !req.session.userId) {
+        return res.status(401).json({ error: "Unauthorized. Session link severed." });
+    }
+
+    const userId = req.session.userId;
+
+    // Extract the telemetry sent from the frontend game engine
+    const {
+        finalScore,
+        levelsCompleted,
+        totalRuntime,
+        totalKills,
+        cracksClosed,
+        corruptionLevel,
+        gameCompleted
+    } = req.body;
+
+    try {
+        // 2. Fetch the player's username for the records
+        let profilesDb = JSON.parse(fs.readFileSync(profilesDbPath, "utf8"));
+        let userProfile = profilesDb.find(p => p.userId === userId);
+        let username = userProfile ? userProfile.username : "Unknown Entity";
+
+        const timestamp = new Date().toISOString();
+
+        // 3. --- UPDATE LEADERBOARD (Individual Run History) ---
+        const leaderboardPath = path.join(__dirname, "data", "leaderboard.json");
+        let leaderboardDb = [];
+        if (fs.existsSync(leaderboardPath)) {
+            leaderboardDb = JSON.parse(fs.readFileSync(leaderboardPath, "utf8"));
+        }
+
+        // Push this specific run to the leaderboard array
+        leaderboardDb.push({
+            runId: crypto.randomUUID(),
+            userId: userId,
+            username: username,
+            finalScore: finalScore || 0,
+            levelsCompleted: levelsCompleted || 0,
+            totalRuntime: totalRuntime || 0,
+            gameCompleted: gameCompleted || false,
+            timestamp: timestamp
+        });
+
+        fs.writeFileSync(leaderboardPath, JSON.stringify(leaderboardDb, null, 2));
+
+        // 4. --- UPDATE PLAYER STATS (Cumulative Lifetime Stats) ---
+        let playerDb = [];
+        if (fs.existsSync(playerDbPath)) {
+            playerDb = JSON.parse(fs.readFileSync(playerDbPath, "utf8"));
+        }
+
+        let playerStatIndex = playerDb.findIndex(p => p.userId === userId);
+
+        if (playerStatIndex !== -1) {
+            // Update existing player profile totals
+            playerDb[playerStatIndex].totalKills = (playerDb[playerStatIndex].totalKills || 0) + (totalKills || 0);
+            playerDb[playerStatIndex].cracksClosed = (playerDb[playerStatIndex].cracksClosed || 0) + (cracksClosed || 0);
+
+            // Only overwrite corruption if they achieved a lower (better) score, or if it's their first time recording it
+            if (corruptionLevel !== undefined) {
+                const currentBest = playerDb[playerStatIndex].corruptionLevel;
+                if (currentBest === undefined || corruptionLevel < currentBest) {
+                    playerDb[playerStatIndex].corruptionLevel = corruptionLevel;
+                }
+            }
+            playerDb[playerStatIndex].lastPlayed = timestamp;
+        } else {
+            // Initialize a brand new player aggregate record if they don't exist
+            playerDb.push({
+                id: crypto.randomUUID(),
+                userId: userId,
+                username: username,
+                totalKills: totalKills || 0,
+                cracksClosed: cracksClosed || 0,
+                corruptionLevel: corruptionLevel !== undefined ? corruptionLevel : 100,
+                lastPlayed: timestamp
+            });
+        }
+
+        fs.writeFileSync(playerDbPath, JSON.stringify(playerDb, null, 2));
+
+        // 5. --- RESET GAMESTATE (Prepare for the next run) ---
+        let gamestateDb = JSON.parse(fs.readFileSync(gamestateDbPath, "utf8"));
+        let stateIndex = gamestateDb.findIndex(g => g.userId === userId);
+        if (stateIndex !== -1) {
+            gamestateDb[stateIndex].currentLevel = 1;
+            gamestateDb[stateIndex].weaponUpgrades = [];
+            gamestateDb[stateIndex].sanityLevel = 100;
+            fs.writeFileSync(gamestateDbPath, JSON.stringify(gamestateDb, null, 2));
+        }
+
+        console.log(`[Telemetry] Run data preserved for ${username}.`);
+        res.json({ message: "Neural link data preserved. Run saved successfully." });
+
+    } catch (error) {
+        console.error("[Telemetry Error] Failed to secure state preservation update:", error);
+        res.status(500).json({ error: "Failed to save player telemetry." });
+    }
+});
+
 // --- MILESTONE 11: Mirror Boss Logic & End-Game Encounter Matrix ---
 app.post("/api/generate-boss-level", async (req, res) => {
     // 1. Build the Arena first so it ALWAYS exists, even if the server fails

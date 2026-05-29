@@ -120,9 +120,14 @@ const cracks = [
 ];
 
 // --- NEW: Progression & Boss Tracking Variables ---
-let levelCount = 1; // Tracks how many rooms the player has cleared
-const upgradesOnMap = []; // Tracks physical upgrade items on the floor
-let boss = null; // Holds the boss entity when spawned
+let levelCount = 1;
+const upgradesOnMap = [];
+let boss = null;
+
+// Add these to track the current run's stats!
+let sessionKills = 0;
+let sessionCracksClosed = 0;
+let isVictoryTriggered = false; // Needed to prevent duplicate saves on boss death
 
 // 4. Structural Array Compilers
 const platforms = [];
@@ -654,14 +659,22 @@ function updateCombat() {
                 boss.hp -= 12;
                 projectiles.splice(i, 1);
 
-                // BOSS DEATH CHECK
-                if (boss.hp <= 0) {
-                    alert(
-                        "THE MIRROR SHATTERS. Dynamic loop terminated. Mind Restored.",
+                // --- UNIFIED BOSS DEATH CHECK ---
+                if (boss.hp <= 0 && !isVictoryTriggered) {
+                    isVictoryTriggered = true;
+                    boss.velocityX = 0;
+                    boss.velocityY = 0;
+
+                    triggerTerminalModal(
+                        "// THE MIRROR SHATTERS",
+                        "Dynamic loop terminated. Mind Restored.",
+                        "victory",
+                        () => {
+                            // Save data and go to main menu
+                            syncDataAndRedirect("/");
+                        },
                     );
-                    boss = null;
-                    window.location.href = "/";
-                    return; // Exit out of the combat loop entirely
+                    return;
                 }
             }
         }
@@ -677,14 +690,22 @@ function updateCombat() {
                     boss.hp -= 25;
                     activeMeleeHitbox.hitEntities.push("boss");
 
-                    // BOSS DEATH CHECK
-                    if (boss.hp <= 0) {
-                        alert(
-                            "THE MIRROR SHATTERS. Dynamic loop terminated. Mind Restored.",
+                    // --- UNIFIED BOSS DEATH CHECK ---
+                    if (boss.hp <= 0 && !isVictoryTriggered) {
+                        isVictoryTriggered = true;
+                        boss.velocityX = 0;
+                        boss.velocityY = 0;
+
+                        triggerTerminalModal(
+                            "// THE MIRROR SHATTERS",
+                            "Dynamic loop terminated. Mind Restored.",
+                            "victory",
+                            () => {
+                                // Save data and go to main menu
+                                syncDataAndRedirect("/");
+                            },
                         );
-                        boss = null;
-                        window.location.href = "/";
-                        return; // Exit out of the combat loop entirely
+                        return;
                     }
                 }
             }
@@ -705,16 +726,23 @@ function updateCombat() {
                 player.currentHealth -= bp.damage; // FIXED VARIABLE
                 bossProjectiles.splice(i, 1);
 
-                // PLAYER DEATH CHECK
-                if (player.currentHealth <= 0) {
-                    alert(
-                        "SYSTEM FAILURE: Vital signs lost. Memory fragmented.",
+                // Inside your damage/health check logic...
+                if (player.currentHealth <= 0 && !isVictoryTriggered) {
+                    isVictoryTriggered = true; // Reusing this flag prevents the modal from spawning 60 times a second
+
+                    // Stop player movement
+                    player.velocityX = 0;
+                    player.velocityY = 0;
+
+                    triggerTerminalModal(
+                        "// CRITICAL SYSTEM FAILURE",
+                        "Your signal was lost to the void. The cycle repeats.",
+                        "failure",
+                        () => {
+                            // Save data and reload the run
+                            syncDataAndRedirect("/game");
+                        },
                     );
-                    player.x = tileWidth * 3;
-                    player.y = canvas.height - tileHeight * 2;
-                    camera.x = 0;
-                    player.currentHealth = player.maxHealth;
-                    player.corruptionLevel = 0;
                 }
                 continue;
             }
@@ -756,16 +784,24 @@ function updateCombat() {
                     player.currentHealth -= bossMeleeHitbox.damage; // FIXED VARIABLE
                     player.invincibilityTimer = 30;
 
-                    // PLAYER DEATH CHECK
-                    if (player.currentHealth <= 0) {
-                        alert(
-                            "SYSTEM FAILURE: Vital signs lost. Memory fragmented.",
+                    // --- REPLACED PLAYER DEATH CHECK ---
+                    // Inside your damage/health check logic...
+                    if (player.currentHealth <= 0 && !isVictoryTriggered) {
+                        isVictoryTriggered = true; // Reusing this flag prevents the modal from spawning 60 times a second
+
+                        // Stop player movement
+                        player.velocityX = 0;
+                        player.velocityY = 0;
+
+                        triggerTerminalModal(
+                            "// CRITICAL SYSTEM FAILURE",
+                            "Your signal was lost to the void. The cycle repeats.",
+                            "failure",
+                            () => {
+                                // Save data and reload the run
+                                syncDataAndRedirect("/game");
+                            },
                         );
-                        player.x = tileWidth * 3;
-                        player.y = canvas.height - tileHeight * 2;
-                        camera.x = 0;
-                        player.currentHealth = player.maxHealth;
-                        player.corruptionLevel = 0;
                     }
                 }
             }
@@ -810,13 +846,23 @@ function updateGhosts() {
             player.velocityY = -6 * scaleY;
             player.velocityX = player.x < ghost.x ? -10 * scaleX : 10 * scaleX;
 
-            if (player.currentHealth <= 0) {
-                alert("SYSTEM FAILURE: Vital signs lost. Memory fragmented.");
-                player.x = tileWidth * 3;
-                player.y = canvas.height - tileHeight * 2;
-                camera.x = 0;
-                player.currentHealth = player.maxHealth;
-                player.corruptionLevel = 0;
+            // Inside your damage/health check logic...
+            if (player.currentHealth <= 0 && !isVictoryTriggered) {
+                isVictoryTriggered = true; // Reusing this flag prevents the modal from spawning 60 times a second
+
+                // Stop player movement
+                player.velocityX = 0;
+                player.velocityY = 0;
+
+                triggerTerminalModal(
+                    "// CRITICAL SYSTEM FAILURE",
+                    "Your signal was lost to the void. The cycle repeats.",
+                    "failure",
+                    () => {
+                        // Save data and reload the run
+                        syncDataAndRedirect("/game");
+                    },
+                );
             }
         }
 
@@ -862,6 +908,7 @@ function updateGhosts() {
 
         // Death Check for Minor Ghost
         if (ghost.hp <= 0) {
+            sessionKills++;
             ghosts.splice(i, 1);
             player.corruptionLevel = Math.max(0, player.corruptionLevel - 5);
         }
@@ -887,13 +934,21 @@ function updateGhosts() {
                         player.velocityY = player.jumpStrength * 0.8; // Bounce off the boss!
                     }
 
-                    // BOSS DEATH CHECK
-                    if (boss.hp <= 0) {
-                        alert(
-                            "THE MIRROR SHATTERS. Dynamic loop terminated. Mind Restored.",
+                    // --- UNIFIED BOSS DEATH CHECK ---
+                    if (boss.hp <= 0 && !isVictoryTriggered) {
+                        isVictoryTriggered = true;
+                        boss.velocityX = 0;
+                        boss.velocityY = 0;
+
+                        triggerTerminalModal(
+                            "// THE MIRROR SHATTERS",
+                            "Dynamic loop terminated. Mind Restored.",
+                            "victory",
+                            () => {
+                                // Save data and go to main menu
+                                syncDataAndRedirect("/");
+                            },
                         );
-                        boss = null;
-                        window.location.href = "/";
                         return;
                     }
                 }
@@ -912,12 +967,22 @@ function updateGhosts() {
                 boss.hp -= 12; // Projectiles deal 12 combat value
                 projectiles.splice(j, 1);
 
-                if (boss.hp <= 0) {
-                    alert(
-                        "THE MIRROR SHATTERS. Dynamic loop terminated. Mind Restored.",
+                // --- UNIFIED BOSS DEATH CHECK ---
+                if (boss.hp <= 0 && !isVictoryTriggered) {
+                    isVictoryTriggered = true;
+                    boss.velocityX = 0;
+                    boss.velocityY = 0;
+
+                    triggerTerminalModal(
+                        "// THE MIRROR SHATTERS",
+                        "Dynamic loop terminated. Mind Restored.",
+                        "victory",
+                        () => {
+                            // Save data and go to main menu
+                            syncDataAndRedirect("/");
+                        },
                     );
-                    boss = null;
-                    window.location.href = "/";
+                    return;
                 }
             }
         }
@@ -962,6 +1027,7 @@ function updateCracks() {
 
                 if (crack.sealProgress >= crack.sealMax) {
                     crack.isSealed = true;
+                    sessionCracksClosed++;
                     // Massive corruption cleanse for sealing a crack!
                     player.corruptionLevel = Math.max(
                         0,
@@ -976,6 +1042,45 @@ function updateCracks() {
             crack.sealProgress = 0;
         }
     });
+}
+
+let isGamePausedForModal = false;
+
+// Sectional Title: System Modal & UI Management
+
+function triggerTerminalModal(titleText, messageText, theme, callback) {
+    // 1. Grab the HTML elements from your EJS file
+    const modalOverlay = document.getElementById("game-modal");
+    const modalBox = modalOverlay.querySelector(".modal-box");
+    const modalTitle = document.getElementById("modal-title");
+    const modalMessage = document.getElementById("modal-message");
+    const modalButton = document.getElementById("modal-button");
+
+    // 2. Inject the dynamic text
+    modalTitle.innerText = titleText;
+    modalMessage.innerText = messageText;
+
+    // 3. Apply the correct CSS theme ('victory' or 'failure')
+    modalBox.className = "modal-box"; // Reset previous classes
+    if (theme) modalBox.classList.add(theme);
+
+    // 4. Force the game engine to pause using your existing flag
+    isTransitioning = true;
+
+    // 5. Reveal the modal overlay (overriding 'display: none')
+    modalOverlay.style.display = "flex";
+
+    // 6. Bind the callback to the button press!
+    modalButton.onclick = () => {
+        // Optional: Update button text to show the player something is happening
+        modalButton.innerText = "SYNCING...";
+        modalButton.style.pointerEvents = "none"; // Prevent double-clicking
+
+        // Execute the syncDataAndRedirect function you passed in
+        if (callback) {
+            callback();
+        }
+    };
 }
 
 function updateUpgrades() {
@@ -1549,6 +1654,46 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
+// Add this function to handle saving player data and redirecting
+async function syncDataAndRedirect() {
+    try {
+        // 1. Prepare the player data to save
+        const playerData = {
+            userId: window.GAME_STATE.playerProfile.userId, // Ensure this matches the server's userId
+            username: window.GAME_STATE.playerProfile.username,
+            currentHealth: player.currentHealth,
+            maxHealth: player.maxHealth,
+            corruptionLevel: player.corruptionLevel,
+            weaponUpgrades: [], // Add any upgrades the player has collected
+            totalKills: 0, // Track total enemies killed
+            cracksClosed: 0, // Track total cracks sealed
+            levelsCompleted: levelCount,
+        };
+
+        // 2. Send the data to the server
+        const response = await fetch("/save-player", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(playerData),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to save player data: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+        console.log("Player data saved:", result.message);
+
+        // 3. Redirect to the next page (e.g., home or leaderboard)
+        window.location.href = "/";
+    } catch (error) {
+        console.error("Error saving player data:", error.message);
+        // Fallback: Redirect even if saving fails
+        window.location.href = "/";
+    }
+}
 // Run engine initialization
 gameLoop();
 

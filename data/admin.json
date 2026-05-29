@@ -1,5 +1,5 @@
 {
-  "levelsUntilBoss": 1,
+  "levelsUntilBoss": 3,
   "playerMaxHealth": 100,
   "playerMeleeDamage": 10,
   "enemyBaseHealth": 30,

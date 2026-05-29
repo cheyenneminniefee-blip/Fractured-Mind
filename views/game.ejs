@@ -10,6 +10,13 @@
 
 <div id="game-container">
     <canvas id="gameCanvas"></canvas>
+    <div id="game-modal" class="modal-overlay">
+        <div class="modal-box">
+            <h2 id="modal-title">// SYSTEM NOTIFICATION</h2>
+            <p id="modal-message">Telemetry data stream initialized...</p>
+            <button id="modal-button" class="modal-btn">ACKNOWLEDGE</button>
+        </div>
+    </div>
 
     <div id="ai-chat-overlay" style="display: none;">
         <div class="chat-history" id="chat-history">
@@ -71,6 +78,78 @@
         border: 2px solid #444455;
         box-shadow: 0 0 30px rgba(0, 0, 0, 0.7);
     }
+
+    /* Modal Background Overlay */
+    .modal-overlay {
+        display: none; /* Hidden by default */
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(13, 14, 18, 0.85); /* Dark desaturated tint */
+        z-index: 9999; /* Sit on top of the canvas */
+        justify-content: center;
+        align-items: center;
+        font-family: monospace;
+    }
+
+    /* The Modal Box */
+    .modal-box {
+        background: #1a1c23;
+        border: 2px solid #2e3244;
+        border-radius: 6px;
+        padding: 30px;
+        width: 90%;
+        max-width: 450px;
+        text-align: center;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
+    }
+
+    #modal-title {
+        margin-top: 0;
+        font-size: 1.4rem;
+        letter-spacing: 0.05em;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #2e3244;
+    }
+
+    #modal-message {
+        color: #d1d5db;
+        font-size: 1rem;
+        line-height: 1.6;
+        margin: 20px 0;
+    }
+
+    /* Action Button */
+    .modal-btn {
+        background: #1e1b4b;
+        color: #a78bfa;
+        border: 1px solid #4338ca;
+        padding: 10px 20px;
+        font-family: monospace;
+        font-size: 1rem;
+        font-weight: bold;
+        border-radius: 4px;
+        cursor: pointer;
+        width: 100%;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        transition: all 0.2s;
+    }
+
+    .modal-btn:hover {
+        background: #4338ca;
+        color: white;
+    }
+
+    /* Contextual Theme Variants managed via JS */
+    .modal-box.victory #modal-title { color: #a78bfa; } /* Purple */
+    .modal-box.victory .modal-btn { border-color: #a78bfa; }
+
+    .modal-box.failure #modal-title { color: #f87171; } /* Red */
+    .modal-box.failure .modal-btn { border-color: #f87171; color: #f87171; }
+    .modal-box.failure .modal-btn:hover { background: #7f1d1d; color: white; }
 
     /* AI Chat Overlay Styling */
     #ai-chat-overlay {
